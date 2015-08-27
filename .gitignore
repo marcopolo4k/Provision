@@ -1,5 +1,6 @@
 files/*
 system.plans/*
 t/provision_files.bak/*
+totransfer.tar
 t/totransfer.tar
 tmp/*
