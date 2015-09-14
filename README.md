@@ -22,19 +22,11 @@ Btw, this system is really ugly, expect some syntax to change in the future (ie 
 Here’s an example system file:
 ```
 marco ~/Dropbox/provision/system.plans (master)$ cat root\@CPANEL 
-```
 ~/.ssh/petvms
-```
 bash_custom.01.linux.root
-```
 bash_custom.02.linux.user
-```
 bash_custom.03.services
-```
 bash_custom.04.qa
-```
 bash_custom.05.cpanel
-```
 .vimrc:SNR:set tags.*:set tags=./tags,tags
-```
 marco ~/Dropbox/provision/system.plans (master)$ 
