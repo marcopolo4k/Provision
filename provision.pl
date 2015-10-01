@@ -50,7 +50,14 @@ foreach my $file ( sort @files ) {
         @use_port = ( '-P', $1 );
     }
     elsif ( $file =~ /bash_custom/ ) {
-        my $file_part = read_file( "files/$file" );
+        my $file_part;
+        if ( $file =~ /(.*):SNR:(.*):(.*)/ ) {
+            my ( $filename, $search, $replace ) = ( $1, $2, $3 );
+            $file_part = read_file( "files/$filename" );
+            $file_part =~ s/$search/$replace/g;
+        } else {
+            $file_part = read_file( "files/$file" );
+        };
         write_file( "$dir_for_files/.bash_custom", {append => 1 }, "\n# $file\n" . $file_part );
     }
     elsif ( $file =~ /(.*):SNR:(.*):(.*)/ ) { # so can't use colons in the regex
