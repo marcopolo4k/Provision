@@ -39,7 +39,7 @@ unless ( -e "system.plans/${user}\@$system" ) {
 chomp( my @files = read_file("system.plans/${user}\@$system") );
 my @use_ssh_key;
 my @use_port;
-foreach my $file ( sort @files ) {
+foreach my $file ( @files ) {
     $file =~ s/~/$ENV{HOME}/g;
     if ( $file =~ /\.ssh/ ) {
         system( 'cp', "${file}.pub", "$dir_for_files/ssh_key" );
@@ -118,5 +118,5 @@ sub help {
 }
 
 # cleanup
-#system( 'rm', '-rf', $dir_for_files )   if ($transfer);
+system( 'rm', '-rf', $dir_for_files )   if ($transfer);
 system( 'rm', '-rf', 'totransfer.tar' ) if ($transfer);
