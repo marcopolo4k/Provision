@@ -5,6 +5,8 @@ use Getopt::Long;
 use File::Slurp;
 use Net::OpenSSH;
 
+use Data::Dumper::Simple;
+
 my $help;
 my $system;
 my $user;
@@ -76,14 +78,22 @@ foreach my $line (@lines) {
 }
 
 system( 'tar', '-cvf', 'totransfer.tar', $dir_for_files );
-if ($transfer) {
-    my $place = "${user}\@$sys_address_for_scp";
 
-    # fixes 'stdin: is not a tty' warning
-    # `scp -q @use_ssh_key @use_port totransfer.tar $place:transferred_by_provision_script.tar >/dev/null 2>&1`;
-    # `scp -q @use_ssh_key @use_port expand.pl $place:provision_expand.pl >/dev/null 2>&1`;
-    system( 'scp', '-q', @use_ssh_key, @use_port, 'totransfer.tar', "$place:transferred_by_provision_script.tar" );
-    system( 'scp', '-q', @use_ssh_key, @use_port, 'expand.pl',      "$place:provision_expand.pl" );
+
+
+if ($transfer) {
+    my %opts = (
+        'user' => $user,
+        'port' => $use_port[1],
+        'key_path' => $use_ssh_key[1],
+    );
+    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    $ssh->error and
+      die "Couldn't establish SSH connection: ". $ssh->error;
+    $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
+    $ssh->scp_put( 'expand.pl', './provision_expand.pl' );
+    $ssh->system( 'perl ./provision_expand.pl' ) or
+     die "remote command failed: " . $ssh->error;
 }
 
 # tmp dir for backups and testing
@@ -96,7 +106,6 @@ sub make_tmp_dir {
 }
 
 sub set_sysip_prompt {
-
     # TODO: use CPANEL by default if system is an IP address without a system file
     open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "Couldn't open file $!";
     print $fh "hostip=$sys_address_for_scp\n";
