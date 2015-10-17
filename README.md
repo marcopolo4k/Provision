@@ -12,7 +12,8 @@ provision.pl <system_name> username
 - /files - list of files to include in those plans
 
 Some basic features: 
-- it stiches together a bash_profile, or any file, from smaller files in files directory
+- it stiches together a bash_custom file, and any file, from smaller files in files directory
+- puts a pointer in .bash_profie to .bash_custom
 - puts your ssh key on the remote system
 - it allows any other random file from files directory to be copied to remote home directory (like .vimrc), and it allows a search and replace on those other random files.
 
