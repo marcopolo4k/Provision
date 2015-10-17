@@ -1,4 +1,4 @@
-~/.ssh/animal
+SSH_KEY:~/.ssh/animal
 bash_custom.01.intdev
 bash_custom.01.linux.root
 bash_custom.02.linux.user

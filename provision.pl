@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use File::Slurp;
+#TODO use Net::OpenSSH;
 
 my $help;
 my $system;
@@ -41,14 +42,15 @@ my @use_ssh_key;
 my @use_port;
 foreach my $file ( @files ) {
     $file =~ s/~/$ENV{HOME}/g;
-    if ( $file =~ /\.ssh/ ) {
-        system( 'cp', "${file}.pub", "$dir_for_files/ssh_key" );
-        if ( $file =~ /(.*)\.pub$/ ) {
-            $file = $1;
+    if ( $file =~ /^SSH_KEY:(.+)/ ) {
+        my $ssh_key = $1;
+        system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
+        if ( $ssh_key =~ /(.*)\.pub$/ ) {
+            $ssh_key = $1;
         }
-        @use_ssh_key = ( '-i', $file );
+        @use_ssh_key = ( '-i', $ssh_key );
     }
-    elsif ( $file =~ /port:(\d*)/ ) {
+    elsif ( $file =~ /^SSH_PORT:(\d*)/ ) {
         @use_port = ( '-P', $1 );
     }
     elsif ( $file =~ /bash_custom/ ) {
@@ -77,14 +79,14 @@ system( 'tar', '-cvf', 'totransfer.tar', $dir_for_files );
 if ($transfer) {
     my $place = "${user}\@$sys_address_for_scp";
 
-    # for 'stdin: is not a tty' error
+    # fixes 'stdin: is not a tty' warning
     # `scp -q @use_ssh_key @use_port totransfer.tar $place:transferred_by_provision_script.tar >/dev/null 2>&1`;
     # `scp -q @use_ssh_key @use_port expand.pl $place:provision_expand.pl >/dev/null 2>&1`;
     system( 'scp', '-q', @use_ssh_key, @use_port, 'totransfer.tar', "$place:transferred_by_provision_script.tar" );
     system( 'scp', '-q', @use_ssh_key, @use_port, 'expand.pl',      "$place:provision_expand.pl" );
 }
 
-# subroutines
+# tmp dir for backups and testing
 sub make_tmp_dir {
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir
         system( 'rm', '-rvf', "${dir_for_files}.bak" );
@@ -94,7 +96,6 @@ sub make_tmp_dir {
 }
 
 sub set_sysip_prompt {
-
     # TODO: use CPANEL by default if system is an IP address without a system file
     open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "Couldn't open file $!";
     print $fh "hostip=$sys_address_for_scp\n";

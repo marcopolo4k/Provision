@@ -1,4 +1,4 @@
-~/.ssh/petvms
+SSH_KEY:~/.ssh/petvms
 bash_custom.01.linux.root
 bash_custom.02.linux.user
 bash_custom.03.services
