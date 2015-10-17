@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 use File::Slurp;
-#TODO use Net::OpenSSH;
+use Net::OpenSSH;
 
 my $help;
 my $system;
@@ -37,41 +37,41 @@ set_sysip_prompt() if ( $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/ );
 unless ( -e "system.plans/${user}\@$system" ) {
     $system = 'CPANEL';
 }
-chomp( my @files = read_file("system.plans/${user}\@$system") );
+chomp( my @lines = read_file("system.plans/${user}\@$system") );
 my @use_ssh_key;
 my @use_port;
-foreach my $file ( @files ) {
-    $file =~ s/~/$ENV{HOME}/g;
-    if ( $file =~ /^SSH_KEY:(.+)/ ) {
+foreach my $line (@lines) {
+    $line =~ s/~/$ENV{HOME}/g;
+    if ( $line =~ /^SSH_KEY:(.+)/ ) {
         my $ssh_key = $1;
         system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
-        if ( $ssh_key =~ /(.*)\.pub$/ ) {
+        if ( $ssh_key =~ /(.*)\.pub$/ ) {    # untested
             $ssh_key = $1;
         }
         @use_ssh_key = ( '-i', $ssh_key );
     }
-    elsif ( $file =~ /^SSH_PORT:(\d*)/ ) {
+    elsif ( $line =~ /^SSH_PORT:(\d*)/ ) {
         @use_port = ( '-P', $1 );
     }
-    elsif ( $file =~ /bash_custom/ ) {
+    elsif ( $line =~ /bash_custom/ ) {
         my $file_part;
-        if ( $file =~ /(.*):SNR:(.*):(.*)/ ) {
+        if ( $line =~ /(.*):SNR:(.*):(.*)/ ) {
             my ( $filename, $search, $replace ) = ( $1, $2, $3 );
             $file_part = read_file("files/$filename");
             $file_part =~ s/$search/$replace/g;
         }
         else {
-            $file_part = read_file("files/$file");
+            $file_part = read_file("files/$line");
         }
-        write_file( "$dir_for_files/.bash_custom", { append => 1 }, "\n# $file\n" . $file_part );
+        write_file( "$dir_for_files/.bash_custom", { append => 1 }, "\n# $line\n" . $file_part );
     }
-    elsif ( $file =~ /(.*):SNR:(.*):(.*)/ ) {    # so can't use colons in the regex
+    elsif ( $line =~ /(.*):SNR:(.*):(.*)/ ) {    # so can't use colons in the regex
         my ( $filename, $search, $replace ) = ( $1, $2, $3 );
-        system("cp files/$filename $dir_for_files/");
+        system( 'cp', "files/$filename", "$dir_for_files/" );
         replace_text_in_file( $dir_for_files, $filename, $search, $replace );
     }
     else {                                       # default files going to user's home dir on destination
-        system("cp files/$file $dir_for_files/");
+        system( 'cp', "files/$line", "$dir_for_files/" );
     }
 }
 
@@ -96,6 +96,7 @@ sub make_tmp_dir {
 }
 
 sub set_sysip_prompt {
+
     # TODO: use CPANEL by default if system is an IP address without a system file
     open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "Couldn't open file $!";
     print $fh "hostip=$sys_address_for_scp\n";
