@@ -10,6 +10,8 @@ use Data::Dumper::Simple;
 my $help;
 my $system;
 my $user;
+my $ssh_key = '';
+my $port = '';
 my $transfer = 1;
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
@@ -40,20 +42,17 @@ unless ( -e "system.plans/${user}\@$system" ) {
     $system = 'CPANEL';
 }
 chomp( my @lines = read_file("system.plans/${user}\@$system") );
-my @use_ssh_key;
-my @use_port;
 foreach my $line (@lines) {
     $line =~ s/~/$ENV{HOME}/g;
     if ( $line =~ /^SSH_KEY:(.+)/ ) {
-        my $ssh_key = $1;
+        $ssh_key = $1;
         system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
         if ( $ssh_key =~ /(.*)\.pub$/ ) {    # untested
             $ssh_key = $1;
         }
-        @use_ssh_key = ( '-i', $ssh_key );
     }
     elsif ( $line =~ /^SSH_PORT:(\d*)/ ) {
-        @use_port = ( '-P', $1 );
+        $port = $1;
     }
     elsif ( $line =~ /bash_custom/ ) {
         my $file_part;
@@ -69,11 +68,11 @@ foreach my $line (@lines) {
     }
     elsif ( $line =~ /(.*):SNR:(.*):(.*)/ ) {    # so can't use colons in the regex
         my ( $filename, $search, $replace ) = ( $1, $2, $3 );
-        system( 'cp', "files/$filename", "$dir_for_files/" );
+        file_copy_to_homedir( $filename );
         replace_text_in_file( $dir_for_files, $filename, $search, $replace );
     }
     else {                                       # default files going to user's home dir on destination
-        system( 'cp', "files/$line", "$dir_for_files/" );
+        file_copy_to_homedir( $line );
     }
 }
 
@@ -84,8 +83,8 @@ system( 'tar', '-cvf', 'totransfer.tar', $dir_for_files );
 if ($transfer) {
     my %opts = (
         'user' => $user,
-        'port' => $use_port[1],
-        'key_path' => $use_ssh_key[1],
+        'port' => $port,
+        'key_path' => $ssh_key,
     );
     my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
     $ssh->error and
@@ -93,7 +92,7 @@ if ($transfer) {
     $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
     $ssh->scp_put( 'expand.pl', './provision_expand.pl' );
     $ssh->system( 'perl ./provision_expand.pl' ) or
-     die "remote command failed: " . $ssh->error;
+      die "remote command failed: " . $ssh->error;
 }
 
 # tmp dir for backups and testing
@@ -103,6 +102,11 @@ sub make_tmp_dir {
         system( 'mv', '-v', $dir_for_files, "${dir_for_files}.bak" );
     }
     system( 'mkdir', $dir_for_files );
+}
+
+sub file_copy_to_homedir {
+    my $filename = $1;
+    system( 'cp', "files/$filename", "$dir_for_files/" );
 }
 
 sub set_sysip_prompt {
