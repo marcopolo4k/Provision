@@ -1,9 +1,9 @@
 SSH_KEY:~/.ssh/petvms
-bash_custom.01.linux.root
-bash_custom.02.linux.user
-bash_custom.03.services
-bash_custom.04.qa.alias
-bash_custom.04.qa.promptps1
-bash_custom.05.cpanel
-bash_custom.05.cpanel.promptps1
-.vimrc:SNR:set tags.*:set tags=./tags,tags
+STITCH_FILES:.bash_custom:bash_custom.01.linux.root
+STITCH_FILES:.bash_custom:bash_custom.02.linux.user
+STITCH_FILES:.bash_custom:bash_custom.03.services
+STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
+STITCH_FILES:.bash_custom:bash_custom.04.qa.promptps1
+STITCH_FILES:.bash_custom:bash_custom.05.cpanel
+STITCH_FILES:.bash_custom:bash_custom.05.cpanel.promptps1
+FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags
