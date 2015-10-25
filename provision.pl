@@ -4,6 +4,7 @@ use warnings;
 use Getopt::Long;
 use File::Slurp;
 use Net::OpenSSH;
+use Config;
 
 use Data::Dumper::Simple;
 
@@ -14,6 +15,7 @@ my $ssh_key  = '';
 my $port     = '22';
 my $transfer = 1;
 my $openstack_sudo = '';
+my $mac_tar_options =  '';
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
     "system=s"  => \$system,
@@ -82,7 +84,9 @@ foreach my $line (@lines) {
 }
 
 print "\nCreating tar of files for transport...\n";
-my $mac_tar_options =  '--disable-copyfile';
+if ( $Config{osname} =~ /darwin/ ) {
+    $mac_tar_options =  '--disable-copyfile';
+}
 system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
 if ($transfer) {
