@@ -10,9 +10,10 @@ use Data::Dumper::Simple;
 my $help;
 my $system;
 my $user;
-my $ssh_key = '';
-my $port = '22';
+my $ssh_key  = '';
+my $port     = '22';
 my $transfer = 1;
+my $openstack_sudo = '';
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
     "system=s"  => \$system,
@@ -39,12 +40,15 @@ make_tmp_dir();
 set_sysip_prompt() if ( $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/ );
 
 unless ( -e "system.plans/${user}\@$system" ) {
-    $system = 'CPANEL'; # default to petvms
+    $system = 'CPANEL';    # default to petvms
 }
 chomp( my @lines = read_file("system.plans/${user}\@$system") );
 foreach my $line (@lines) {
     $line =~ s/~/$ENV{HOME}/g;
-    if ( $line =~ /^SSH_KEY:(.+)/ ) {
+    if ( $line =~ /^OPENSTACK_SUDO:(.+)/ ) {
+        $openstack_sudo = 'sudo -i;';
+    }
+    elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
         $ssh_key = $1;
         system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
         if ( $ssh_key =~ /(.*)\.pub$/ ) {    # untested
@@ -54,34 +58,22 @@ foreach my $line (@lines) {
     elsif ( $line =~ /^SSH_PORT:(\d*)/ ) {
         $port = $1;
     }
-    elsif ( $line =~ /^FILE:(.*)/ ) {    # warning: can't use colons in the regex
+    elsif ( $line =~ /^FILE:(.*)/ ) {        # warning: can't use colons in the regex
         my $remainder_of_line = $1;
         if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    # warning: can't use colons in the regex
             my ( $filename, $search, $replace ) = ( $1, $2, $3 );
-            file_copy_to_tmp_homedir( $filename );
+            file_copy_to_tmp_homedir($filename);
             replace_text_in_file( $dir_for_files, $filename, $search, $replace );
         }
-        else {                                       # default files going to user's home dir on destination
-            file_copy_to_tmp_homedir( $remainder_of_line );
+        else {                                                 # default files going to user's home dir on destination
+            file_copy_to_tmp_homedir($remainder_of_line);
         }
     }
     elsif ( $line =~ /^STITCH_FILES:(.*):(.*)(:.)*/ ) {
-        my ( $filename_dest, $filename_local, $remainder_of_line ) = ( $1, $2, $3 );
-        if ( ! defined $remainder_of_line || $remainder_of_line =~ /^\s+$/ ) {
-            $remainder_of_line = '';
-        }
-        my $file_part;
-        if ( $remainder_of_line =~ /SNR:(.*):(.*)/ ) {
-            my ( $search, $replace ) = ( $1, $2 );
-            $file_part = read_file("files/$filename_local");
-            $file_part =~ s/$search/$replace/g;
-        }
-        else {
-            $file_part = read_file("files/$filename_local");
-        }
-        write_file( "$dir_for_files/$filename_dest", { append => 1 }, "\n# $filename_local\n" . $file_part );
+        # $filename_dest, $filename_local, $remainder_of_line
+        stitch_file( $1, $2, $3 );
     }
-    else {                                       # should be nothing
+    else {    # should be nothing
         print "The system file has an (improperly|un)labeled entry:\n";
         print "[$line]\n";
         print "Please see docs or label all entries\n";
@@ -90,28 +82,28 @@ foreach my $line (@lines) {
 }
 
 print "\nCreating tar of files for transport...\n";
-system( 'tar', '-cvf', 'totransfer.tar', $dir_for_files );
+my $mac_tar_options =  '--disable-copyfile';
+system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
 if ($transfer) {
     my %opts = (
-        'user' => $user,
-        'port' => $port,
+        'user'     => $user,
+        'port'     => $port,
         'key_path' => $ssh_key,
     );
 
     my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-    $ssh->error and
-      die "Couldn't establish SSH connection: ". $ssh->error;
+    $ssh->error
+        and die "Couldn't establish SSH connection: " . $ssh->error;
 
     print "\nCopying files to destination...\n";
     $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
-    $ssh->scp_put( 'expand.pl', './provision_expand.pl' );
+    $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
 
     print "\nExpanding files on destination...\n";
-    $ssh->system( 'perl ./provision_expand.pl' ) or
-      die "remote command failed: " . $ssh->error;
+    $ssh->system( "$openstack_sudo perl ./provision_expand.pl" )
+        or die "remote command failed: " . $ssh->error;
 }
-
 
 # tmp dir for backups and testing
 sub make_tmp_dir {
@@ -129,7 +121,6 @@ sub file_copy_to_tmp_homedir {
 }
 
 sub set_sysip_prompt {
-    # TODO: use CPANEL by default if system is an IP address without a system file
     open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "Couldn't open file $!";
     print $fh "hostip=$sys_address_for_scp\n";
 }
@@ -141,6 +132,24 @@ sub replace_text_in_file {
     my $data = $file->slurp_utf8;
     $data =~ s/$search/$replace/g;
     $file->spew_utf8($data);
+}
+
+sub stitch_file {
+        my ( $filename_dest, $filename_local, $remainder_of_line ) = ( $1, $2, $3 );
+        if ( !defined $remainder_of_line || $remainder_of_line =~ /^\s+$/ ) {
+            $remainder_of_line = '';
+        }
+        my $file_part;
+        if ( $remainder_of_line =~ /SNR:(.*):(.*)/ ) {
+            my ( $search, $replace ) = ( $1, $2 );
+            $file_part = read_file("files/$filename_local");
+            $file_part =~ s/$search/$replace/g;
+        }
+        else {
+            $file_part = read_file("files/$filename_local");
+        }
+        write_file( "$dir_for_files/$filename_dest", { append => 1 }, "\n# $filename_local\n" . $file_part );
+
 }
 
 sub help {

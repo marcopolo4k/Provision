@@ -40,3 +40,7 @@ my $old_vimrc = $ssh->capture("find .vimrc -mmin +1 2>&1");
 # see prev comments
 unlike( $old_vimrc, qr/vimrc$/, "remote system .vimrc is not old" );
 unlike( $old_vimrc, qr/No such file/, "remote system .vimrc exists" );
+my $old_cpvmsetup_slow = $ssh->capture("find cpvmsetup_slow.pl -mmin +1 2>&1");
+# see prev comments
+unlike( $old_cpvmsetup_slow, qr/cpvmsetup_slow.pl$/, "remote system cpvmsetup_slow.pl is not old" );
+unlike( $old_cpvmsetup_slow, qr/No such file/, "remote system cpvmsetup_slow.pl exists" );

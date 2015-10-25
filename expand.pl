@@ -14,6 +14,11 @@ for my $file (@files) {
     if ( $file =~ /ssh_key/ ) {
         authorize_key($file);
     }
+    # TODO
+    # elsif ( $file =~ /^RUN_BASH_(.*)/ {
+    #     my $filename = $1;
+    #     system( "sh $1" );
+    # }
     else {    # add non-default files above here
         replace_file( $file, "$ENV{HOME}/" );
     }
@@ -43,8 +48,9 @@ sub ensure_bash_custom_ref {
 sub replace_file {
     my ( $filename, $location ) = @_;
     my $full_path_dest = "$location/$filename";
+    # if file already exists, save as file.bak
     if ( -e $full_path_dest ) {
-        system("cat $full_path_dest >> $full_path_dest.bak");
+        system( "cat $full_path_dest >> $full_path_dest.bak" );
     }
     system( 'cp', "$dir_for_files/$filename", $full_path_dest );
 }
@@ -55,7 +61,7 @@ sub authorize_key {
         system( 'mkdir', "$ENV{HOME}/.ssh" );
         system( 'chmod', '700', "$ENV{HOME}/.ssh" );
     }
-    system("cat $dir_for_files/$key_file >> $ENV{HOME}/.ssh/authorized_keys");
+    system( "cat $dir_for_files/$key_file >> $ENV{HOME}/.ssh/authorized_keys" );
 }
 
 ## Cleanup

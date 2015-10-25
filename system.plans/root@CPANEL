@@ -7,3 +7,5 @@ STITCH_FILES:.bash_custom:bash_custom.04.qa.promptps1
 STITCH_FILES:.bash_custom:bash_custom.05.cpanel
 STITCH_FILES:.bash_custom:bash_custom.05.cpanel.promptps1
 FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags
+FILE:cpvmsetup_fast.pl
+FILE:cpvmsetup_slow.pl
