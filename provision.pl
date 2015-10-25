@@ -125,7 +125,7 @@ sub file_copy_to_tmp_homedir {
 }
 
 sub set_sysip_prompt {
-    open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "Couldn't open file $!";
+    open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "At least one .bash_custom system file is required.  Couldn't open file $!";
     print $fh "hostip=$sys_address_for_scp\n";
 }
 
