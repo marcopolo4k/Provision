@@ -4,6 +4,7 @@ use warnings;
 use Getopt::Long;
 use File::Slurp;
 use Net::OpenSSH;
+#$Net::OpenSSH::debug = -1;
 use Config;
 
 use Data::Dumper::Simple;
@@ -14,7 +15,7 @@ my $user;
 my $ssh_key  = '';
 my $port     = '22';
 my $transfer = 1;
-my $openstack_sudo = '';
+my $openstack_sudo = 0;
 my $mac_tar_options =  '';
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
@@ -47,8 +48,8 @@ unless ( -e "system.plans/${user}\@$system" ) {
 chomp( my @lines = read_file("system.plans/${user}\@$system") );
 foreach my $line (@lines) {
     $line =~ s/~/$ENV{HOME}/g;
-    if ( $line =~ /^OPENSTACK_SUDO:(.+)/ ) {
-        $openstack_sudo = 'sudo -i;';
+    if ( $line =~ /^OPENSTACK_SUDO:$/ ) {
+        $openstack_sudo = 1;
     }
     elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
         $ssh_key = $1;
@@ -89,7 +90,7 @@ if ( $Config{osname} =~ /darwin/ ) {
 }
 system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
-if ($transfer) {
+if ( $transfer && ! $openstack_sudo ) {
     my %opts = (
         'user'     => $user,
         'port'     => $port,
@@ -105,8 +106,39 @@ if ($transfer) {
     $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
 
     print "\nExpanding files on destination...\n";
-    $ssh->system( "$openstack_sudo perl ./provision_expand.pl" )
+    $ssh->system( 'perl', './provision_expand.pl' )
         or die "remote command failed: " . $ssh->error;
+}
+elsif ( $transfer && $openstack_sudo ) {
+    my %opts = (
+        'user'     => $user,
+        'port'     => $port,
+        'key_path' => $ssh_key,
+    );
+
+    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    $ssh->error
+        and die "Couldn't establish SSH connection: " . $ssh->error;
+        my @capture;
+
+    print "\nCopying files to destination and expanding...\n";
+    $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
+    $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
+
+    # standard OpenSSH examples didn't work
+    my $cmd = <<'EOF';
+sudo -i
+cd
+pwd
+mv -v /home/centos/transferred_by_provision_script.tar ./
+mv -v /home/centos/provision_expand.pl ./
+perl ./provision_expand.pl
+sed -i.bak '/no-agent-forwarding/d' /root/.ssh/authorized_keys
+exit
+exit
+
+EOF
+    @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
 }
 
 # tmp dir for backups and testing
