@@ -14,7 +14,6 @@ my $user;
 my $ssh_key  = '';
 my $port     = '22';
 my $transfer = 1;
-my $openstack_sudo = '';
 my $mac_tar_options =  '';
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
@@ -47,10 +46,7 @@ unless ( -e "system.plans/${user}\@$system" ) {
 chomp( my @lines = read_file("system.plans/${user}\@$system") );
 foreach my $line (@lines) {
     $line =~ s/~/$ENV{HOME}/g;
-    if ( $line =~ /^OPENSTACK_SUDO:(.+)/ ) {
-        $openstack_sudo = 'sudo -i;';
-    }
-    elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
+    if ( $line =~ /^SSH_KEY:(.+)/ ) {
         $ssh_key = $1;
         system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
         if ( $ssh_key =~ /(.*)\.pub$/ ) {    # untested
@@ -105,7 +101,7 @@ if ($transfer) {
     $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
 
     print "\nExpanding files on destination...\n";
-    $ssh->system( "$openstack_sudo perl ./provision_expand.pl" )
+    $ssh->system( 'perl', './provision_expand.pl' )
         or die "remote command failed: " . $ssh->error;
 }
 
