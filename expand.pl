@@ -14,11 +14,9 @@ for my $file (@files) {
     if ( $file =~ /ssh_key/ ) {
         authorize_key($file);
     }
-    # TODO
-    # elsif ( $file =~ /^RUN_BASH_(.*)/ {
-    #     my $filename = $1;
-    #     system( "sh $1" );
-    # }
+    elsif ( $file =~ /^RUN_BASH_(.*)/ ) {
+        system( "sh $dir_for_files/$file" );
+    }
     else {    # add non-default files above here
         replace_file( $file, "$ENV{HOME}/" );
     }

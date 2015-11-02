@@ -64,12 +64,17 @@ foreach my $line (@lines) {
         my $remainder_of_line = $1;
         if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    # warning: can't use colons in the regex
             my ( $filename, $search, $replace ) = ( $1, $2, $3 );
-            file_copy_to_tmp_homedir($filename);
+            file_copy_to_tmp_homedir($filename, '');
             replace_text_in_file( $dir_for_files, $filename, $search, $replace );
         }
-        else {                                                 # default files going to user's home dir on destination
-            file_copy_to_tmp_homedir($remainder_of_line);
+        else { # default files going to user's home dir on destination
+            file_copy_to_tmp_homedir($remainder_of_line, '');
         }
+    }
+    elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
+        my $filename = $1;
+        my $change_name_to = 'RUN_BASH_' . $filename;
+        file_copy_to_tmp_homedir($filename, $change_name_to);
     }
     elsif ( $line =~ /^STITCH_FILES:(.*):(.*)(:.)*/ ) {
         # $filename_dest, $filename_local, $remainder_of_line
@@ -83,7 +88,7 @@ foreach my $line (@lines) {
     }
 }
 
-print "\nCreating tar of files for transport...\n";
+print "\n\nCreating tar of files for transport...\n";
 if ( $Config{osname} =~ /darwin/ ) {
     $mac_tar_options =  '--disable-copyfile';
 }
@@ -129,6 +134,7 @@ EOF
         my @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
     }
     else {
+        # not OpenStack sudo, this is probably the more common use case
         $ssh->system( 'perl', './provision_expand.pl' )
             or die "remote command failed: " . $ssh->error;
     }
@@ -144,9 +150,16 @@ sub make_tmp_dir {
 }
 
 sub file_copy_to_tmp_homedir {
-    my $filename = $1;
+    my ( $filename, $change_name_to ) = ( @_ );
+    my $new_filename;
+    if ( $change_name_to eq '' ) {
+        $new_filename = $filename;
+    }
+    else {
+        $new_filename = $change_name_to;
+    }
     print "\nAdding to local copy of files for transport...";
-    system( 'cp', "files/$filename", "$dir_for_files/" );
+    system( 'cp', "files/$filename", "$dir_for_files/$new_filename" );
 }
 
 sub set_sysip_prompt {

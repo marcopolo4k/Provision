@@ -14,7 +14,7 @@ like( $out, qr!a tmp/provision_files!, "Text is displayed for local login: 'a tm
 like( `echo $?`, qr/0/, "./provision.pl bash command error code success." );
 like( $?, qr/0/, "perl error code is success." );
 
-foreach my $file (qw/.bash_custom .vimrc ssh_key/) {
+foreach my $file (qw/.bash_custom .vimrc ssh_key RUN_BASH_local_test_vm.sh/) {
     like( $out, qr!a tmp/provision_files/$file!, "Text is displayed indicating $file was transferred to local login: 'a tmp/provision_files/$file'" );
 }
 
@@ -44,3 +44,7 @@ my $old_cpvmsetup_slow = $ssh->capture("find cpvmsetup_slow.pl -mmin +1 2>&1");
 # see prev comments
 unlike( $old_cpvmsetup_slow, qr/cpvmsetup_slow.pl$/, "remote system cpvmsetup_slow.pl is not old" );
 unlike( $old_cpvmsetup_slow, qr/No such file/, "remote system cpvmsetup_slow.pl exists" );
+
+
+my $files_in_home = $ssh->capture("ls ~ 2>&1");
+like( $files_in_home, qr/it_worked.txt/, "Bash script executed and created file on remote system." );
