@@ -4,7 +4,6 @@ use warnings;
 use Getopt::Long;
 use File::Slurp;
 use Net::OpenSSH;
-#$Net::OpenSSH::debug = -1;
 use Config;
 
 use Data::Dumper::Simple;
@@ -90,43 +89,32 @@ if ( $Config{osname} =~ /darwin/ ) {
 }
 system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
-if ( $transfer && ! $openstack_sudo ) {
+if ( $transfer ) {
     my %opts = (
         'user'     => $user,
         'port'     => $port,
         'key_path' => $ssh_key,
     );
-
     my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-    $ssh->error
-        and die "Couldn't establish SSH connection: " . $ssh->error;
+
+    if ( $ssh->error ) {
+        print "SSH attempt failed using the key specified.  Let's try using a password:\n";
+        delete $opts{'key_path'};
+        chomp( my $pass = <STDIN> );
+        $opts{'password'} = $pass;
+        $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+        $ssh->error
+            and die "Couldn't establish SSH connection: " . $ssh->error;
+    }
 
     print "\nCopying files to destination...\n";
     $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
     $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
 
     print "\nExpanding files on destination...\n";
-    $ssh->system( 'perl', './provision_expand.pl' )
-        or die "remote command failed: " . $ssh->error;
-}
-elsif ( $transfer && $openstack_sudo ) {
-    my %opts = (
-        'user'     => $user,
-        'port'     => $port,
-        'key_path' => $ssh_key,
-    );
-
-    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-    $ssh->error
-        and die "Couldn't establish SSH connection: " . $ssh->error;
-        my @capture;
-
-    print "\nCopying files to destination and expanding...\n";
-    $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
-    $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
-
-    # standard OpenSSH examples didn't work
-    my $cmd = <<'EOF';
+    if ( $openstack_sudo ) {
+        # standard OpenSSH examples didn't work
+        my $cmd = <<'EOF';
 sudo -i
 cd
 pwd
@@ -138,7 +126,12 @@ exit
 exit
 
 EOF
-    @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
+        my @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
+    }
+    else {
+        $ssh->system( 'perl', './provision_expand.pl' )
+            or die "remote command failed: " . $ssh->error;
+    }
 }
 
 # tmp dir for backups and testing
@@ -152,7 +145,7 @@ sub make_tmp_dir {
 
 sub file_copy_to_tmp_homedir {
     my $filename = $1;
-    print "\nMaking local copy of files for transport...\n";
+    print "\nAdding to local copy of files for transport...";
     system( 'cp', "files/$filename", "$dir_for_files/" );
 }
 
