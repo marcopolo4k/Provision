@@ -11,12 +11,22 @@ Use one or two arguments:
 - /system.plans - list of systems' plans
 - /files - list of files to include in those plans
 
-Some basic features: 
-- stiches together a bash_custom file, and any file, from smaller files in /files
-    .bash_custom is mandatory (but blank is ok) for now. for stuff you'd put in bashrc or bash_profile
-- puts a pointer in .bash_profie to .bash_custom
-- adds your ssh pub key to remote system known_hosts
-- it allows any other random file from files directory to be copied to remote home directory (like .vimrc), and it allows a search and replace (SNR) on those other random files.
+Features. This is mainly designed to get basic environment stuffs over to a newly provisioned VM: 
+- Stitch together a bash_custom file.  The stitching is handy so some parts are universal, while others are specific to one VM.  A reference is put into bash_profile and bashrc to bash_custom.
+- Copy .vimrc file.
+- Insert your ssh key into authorized hosts.
+
+But, it will also:
+- Copy any file you specify over to the home dir
+- Perform search and replace on parts of the file
+- Run any bash script
+- 'sudo -i' to root if needed (like some cP OS images)
+
+Installation.
+4 perl modules need to be installed:
+```
+cpan -i Getopt::Long File::Slurp Net::OpenSSH Config
+```
 
 So the system.plans/files look something like:
 ```

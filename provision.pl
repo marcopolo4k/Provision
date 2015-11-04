@@ -6,8 +6,6 @@ use File::Slurp;
 use Net::OpenSSH;
 use Config;
 
-use Data::Dumper::Simple;
-
 my $help;
 my $system;
 my $user;
