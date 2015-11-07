@@ -25,6 +25,23 @@ like( $out_local_login, qr/$qr/, "Text is displayed for local login: '$qr'" );
 $qr = "a tmp/provision_files/cpvmsetup_fast.pl";
 like( $out_local_login, qr/$qr/, "Text is displayed for local login: '$qr'" );
 
-# make sure dummy file always has vimrc
-my $vimrc = `grep cpanel-store system.plans/root\@dummy.system`;
-like( $vimrc, qr/cpanel-store/, "vimrc search and replace work since cpanel-store is found" );
+# ensure files are saved to tmp dir
+my $tar_list = `ls -la tmp/provision_files`;
+foreach my $file ( qw/ssh_key .bash_custom .vimrc/ ) {
+    like( $tar_list, qr/$file/, "$file was added to ./tmp/provision_files directory" );
+}
+
+# checking for words indicating specific functionality works
+my %check_text = ( 
+    '.vimrc' => 'cpanel-store', # SNR (for FILE)
+    '.bash_custom' => 'test text in custom file'  # ADD_TO
+);
+# ensure certain words are in dummy system file
+foreach my $certain_words ( values %check_text ) {
+    chomp( my $sysfile_check = `grep "$certain_words" system.plans/root\@dummy.system` );
+    like( $sysfile_check, qr/$certain_words/, "dummy system file has $certain_words in it, ready for post-tmp check" );
+}
+foreach my $file ( keys %check_text ) {
+    my $words_check = `grep "$check_text{$file}"  ./tmp/provision_files/$file`;
+    like( $words_check, qr/$check_text{$file}/, "$file has $check_text{$file}, so that functionality works" );
+}

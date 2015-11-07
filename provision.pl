@@ -52,7 +52,7 @@ foreach my $line (@lines) {
     elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
         $ssh_key = $1;
         system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
-        if ( $ssh_key =~ /(.*)\.pub$/ ) {    # untested
+        if ( $ssh_key =~ /(.*)\.pub$/ ) {    # never used unless user messes up, but also not tested
             $ssh_key = $1;
         }
     }
@@ -70,9 +70,9 @@ foreach my $line (@lines) {
             file_copy_to_tmp_homedir($remainder_of_line, '');
         }
     }
-    elsif ( $line =~ /^STITCH_FILES:(.*):(.*)(:.)*/ ) {
-        # $filename_dest, $filename_local, $remainder_of_line
-        stitch_file( $1, $2, $3 );
+    elsif ( $line =~ /^STITCH_FILES:(.+?):([^:]+)(:(.+))?/ ) {
+        # $filename_dest, $filename_local (or a directive), $remainder_of_line
+        stitch_file( $1, $2, $4 );
     }
     elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
         my $filename = $1;
@@ -175,21 +175,20 @@ sub replace_text_in_file {
 }
 
 sub stitch_file {
-        my ( $filename_dest, $filename_local, $remainder_of_line ) = ( $1, $2, $3 );
+        my ( $filename_dest, $filename_local, $remainder_of_line ) = ( @_ );
         if ( !defined $remainder_of_line || $remainder_of_line =~ /^\s+$/ ) {
             $remainder_of_line = '';
         }
         my $file_part;
-        if ( $remainder_of_line =~ /^SNR:(.*):(.*)/ ) {
+        if ( $filename_local =~ /^SNR$/ ) { # untested
+            $remainder_of_line =~ /(.*):(.*)/;
             my ( $search, $replace ) = ( $1, $2 );
             $file_part = read_file("files/$filename_local");
             $file_part =~ s/$search/$replace/g;
         }
-        # if ( $remainder_of_line =~ /^ADD_TO:(.*):(.*)/ ) {
-        #     my ( $search, $replace ) = ( $1, $2 );
-        #     $file_part = read_file("files/$filename_local");
-        #     $file_part =~ s/$search/$replace/g;
-        # }
+        elsif ( $filename_local =~ /^ADD_TO$/ ) {
+            $file_part = $remainder_of_line;
+        }
         else {
             $file_part = read_file("files/$filename_local");
         }
@@ -206,5 +205,7 @@ sub help {
 }
 
 # cleanup
-system( 'rm', '-rf', $dir_for_files )   if ($transfer);
-system( 'rm', '-rf', 'totransfer.tar' ) if ($transfer);
+if ( $transfer ) {
+    system( 'rm', '-rf', $dir_for_files )   if ($transfer);
+    system( 'rm', '-rf', 'totransfer.tar' ) if ($transfer);
+}
