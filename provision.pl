@@ -2,9 +2,10 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use File::Slurp;
+use File::Slurp qw(read_file write_file);
 use Net::OpenSSH;
 use Config;
+use Path::Tiny qw(path);
 
 my $help;
 my $system;
@@ -69,14 +70,14 @@ foreach my $line (@lines) {
             file_copy_to_tmp_homedir($remainder_of_line, '');
         }
     }
+    elsif ( $line =~ /^STITCH_FILES:(.*):(.*)(:.)*/ ) {
+        # $filename_dest, $filename_local, $remainder_of_line
+        stitch_file( $1, $2, $3 );
+    }
     elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
         my $filename = $1;
         my $change_name_to = 'RUN_BASH_' . $filename;
         file_copy_to_tmp_homedir($filename, $change_name_to);
-    }
-    elsif ( $line =~ /^STITCH_FILES:(.*):(.*)(:.)*/ ) {
-        # $filename_dest, $filename_local, $remainder_of_line
-        stitch_file( $1, $2, $3 );
     }
     else {    # should be nothing
         print "The system file has an (improperly|un)labeled entry:\n";
@@ -167,7 +168,6 @@ sub set_sysip_prompt {
 
 sub replace_text_in_file {
     my ( $dir, $filename, $search, $replace ) = @_;
-    use Path::Tiny qw(path);
     my $file = path("$dir/$filename");
     my $data = $file->slurp_utf8;
     $data =~ s/$search/$replace/g;
@@ -180,11 +180,16 @@ sub stitch_file {
             $remainder_of_line = '';
         }
         my $file_part;
-        if ( $remainder_of_line =~ /SNR:(.*):(.*)/ ) {
+        if ( $remainder_of_line =~ /^SNR:(.*):(.*)/ ) {
             my ( $search, $replace ) = ( $1, $2 );
             $file_part = read_file("files/$filename_local");
             $file_part =~ s/$search/$replace/g;
         }
+        # if ( $remainder_of_line =~ /^ADD_TO:(.*):(.*)/ ) {
+        #     my ( $search, $replace ) = ( $1, $2 );
+        #     $file_part = read_file("files/$filename_local");
+        #     $file_part =~ s/$search/$replace/g;
+        # }
         else {
             $file_part = read_file("files/$filename_local");
         }
