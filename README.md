@@ -1,7 +1,7 @@
 Provision
 ==========
 
-Script to provision files to a new server
+Script to provision files to CentOS VM's
 
 # Usage
 Use one or two arguments:
@@ -28,19 +28,19 @@ perl modules need to be installed:
 cpan -i Getopt::Long File::Slurp Net::OpenSSH Config Path::Tiny
 ```
 
-So the system.plans/files look something like:
+The system.plans/files look something like (without the '#' comments):
 ```
 [~/provision/system.plans]$ cat userme\@demotest.server
 SSH_KEY:~/.ssh/id_rsa
 SSH_PORT:602
 FILE:a_file_you_want_in_homedir.txt
 FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags
+OPENSTACK_SUDO: # cludgy escalate for OpenStack VM's, this will change based on feedback
+RUN_BASH_SCRIPT:do_something_custom.sh
 STITCH_FILES:.bash_custom:bash_custom.02.linux.user
 STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
-STITCH_FILES:.bash_custom:bash_custom.anotherone:SNR:searching for this:replacing with this # not really tested
-OPENSTACK_SUDO: # cludgy escalate for OS VM's
-RUN_BASH_SCRIPT:do_something_custom.sh
-APPEND:.bash_custom:alias tp='top -blah blah' # not done yet - placeholder
+STITCH_FILES:.bash_custom:ADD_TO:alias tp='top -blah blah'
+STITCH_FILES:.bash_custom:bash_custom.anotherone:SNR:search for this:replace with this # not well tested
 ```
 
 A couple examples of what I use currently:
