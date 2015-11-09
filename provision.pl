@@ -41,7 +41,7 @@ make_tmp_dir();
 set_sysip_prompt() if ( $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/ );
 
 unless ( -e "system.plans/${user}\@$system" ) {
-    $system = 'CPANEL';    # default to petvms
+    $system = 'DEFAULT';
 }
 chomp( my @lines = read_file("system.plans/${user}\@$system") );
 foreach my $line (@lines) {
