@@ -4,7 +4,6 @@ STITCH_FILES:.bash_custom:bash_custom.01.linux.root
 STITCH_FILES:.bash_custom:bash_custom.02.linux.user
 STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
 STITCH_FILES:.bash_custom:bash_custom.04.qa.promptps1
-STITCH_FILES:.bash_custom:bash_custom.06.store
 STITCH_FILES:.bash_custom:ADD_TO:test text in custom file
 FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags,/home/store/git/cpanel-store/tags
 FILE:cpvmsetup_fast.pl

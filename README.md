@@ -23,9 +23,9 @@ But, it will also:
 - 'sudo -i' to root if needed (like some cP OS images)
 
 Installation.
-4 perl modules need to be installed:
+perl modules need to be installed:
 ```
-cpan -i Getopt::Long File::Slurp Net::OpenSSH Config
+cpan -i Getopt::Long File::Slurp Net::OpenSSH Config Path::Tiny
 ```
 
 So the system.plans/files look something like:
