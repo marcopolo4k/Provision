@@ -32,16 +32,18 @@ foreach my $file ( qw/ssh_key .bash_custom .vimrc/ ) {
 }
 
 # checking for words indicating specific functionality works
-my %check_text = ( 
-    '.vimrc' => 'cpanel-store', # SNR (for FILE)
-    '.bash_custom' => 'test text in custom file'  # ADD_TO
+my @check_text_array = ( 
+    { 'title' => 'SNR for FILE', 'file' => '.vimrc', 'text' => 'cpanel-store' },
+    { 'title' => 'SNR for STITCH', 'file' => '.bash_custom', 'text' => 'NewName' }, 
+    { 'title' => 'ADD_TO', 'file' => '.bash_custom', 'text' => 'test text in custom file' } 
 );
 # ensure certain words are in dummy system file
-foreach my $certain_words ( values %check_text ) {
-    chomp( my $sysfile_check = `grep "$certain_words" system.plans/root\@dummy.system` );
-    like( $sysfile_check, qr/$certain_words/, "dummy system file has $certain_words in it, ready for post-tmp check" );
+foreach my $feature_first_check ( @check_text_array ) {
+    chomp( my $sysfile_check = `grep "$feature_first_check->{'text'}" system.plans/root\@dummy.system` );
+    like( $sysfile_check, qr/$feature_first_check->{'text'}/, "dummy system file has $feature_first_check->{'text'} in it, ready for post-tmp check for feature \'$feature_first_check->{'title'}\'" );
 }
-foreach my $file ( keys %check_text ) {
-    my $words_check = `grep "$check_text{$file}"  ./tmp/provision_files/$file`;
-    like( $words_check, qr/$check_text{$file}/, "$file has $check_text{$file}, so that functionality works" );
+# ensure those same words are in the files to be shipped
+foreach my $feature_second_check ( @check_text_array ) {
+    my $words_check = `grep "$feature_second_check->{'text'}"  ./tmp/provision_files/$feature_second_check->{'file'}`;
+    like( $words_check, qr/$feature_second_check->{'text'}/, "$feature_second_check->{'file'} has $feature_second_check->{'text'}, so the feature \'$feature_second_check->{'title'}\' works" );
 }

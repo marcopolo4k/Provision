@@ -12,13 +12,14 @@ Use one or two arguments:
 - /files - list of files to include in those plans
 
 Features. This is mainly designed to get basic environment stuffs over to a newly provisioned VM: 
-- Stitch together a bash_custom file.  The stitching is handy so some parts are universal, while others are specific to one VM.  A reference is put into bash_profile and bashrc to bash_custom.
+- Stitch together a bash_custom file.  This let's you have a hierarchy of alias files for 'all VMs' vs 'QA VMs'.  Reference are automatically added: bash_profile->bash_custom bashrc->bash_custom.
 - Copy .vimrc file.
 - Insert your ssh key into authorized hosts.
 
 But, it will also:
 - Copy any file you specify over to the home dir
-- Perform search and replace on parts of the file
+- Perform search and replace on any file
+- Perform the mentioned 'stitching' on any file
 - Run any bash script
 - 'sudo -i' to root if needed (like some cP OS images)
 

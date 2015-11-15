@@ -5,6 +5,8 @@ STITCH_FILES:.bash_custom:bash_custom.02.linux.user
 STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
 STITCH_FILES:.bash_custom:bash_custom.04.qa.promptps1
 STITCH_FILES:.bash_custom:ADD_TO:test text in custom file
+STITCH_FILES:.bash_custom:bash_custom.10.prompt:SNR:CHANGME:NewName
 FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags,/home/store/git/cpanel-store/tags
 FILE:cpvmsetup_fast.pl
 FILE:cpvmsetup_slow.pl
+FILE:.tmux.conf

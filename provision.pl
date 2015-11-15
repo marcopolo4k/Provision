@@ -6,6 +6,7 @@ use File::Slurp qw(read_file write_file);
 use Net::OpenSSH;
 use Config;
 use Path::Tiny qw(path);
+use File::Basename qw{dirname};
 
 my $help;
 my $system;
