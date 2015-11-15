@@ -6,7 +6,6 @@ use File::Slurp qw(read_file write_file);
 use Net::OpenSSH;
 use Config;
 use Path::Tiny qw(path);
-use File::Basename qw{dirname};
 
 my $help;
 my $system;
@@ -143,7 +142,7 @@ EOF
 # tmp dir for backups and testing
 sub make_tmp_dir {
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir
-        system( 'rm', '-rvf', "${dir_for_files}.bak" );
+        system( 'rm', '-rf', "${dir_for_files}.bak" );
         system( 'mv', '-v', $dir_for_files, "${dir_for_files}.bak" );
     }
     system( 'mkdir', $dir_for_files );
@@ -158,7 +157,7 @@ sub file_copy_to_tmp_homedir {
     else {
         $new_filename = $change_name_to;
     }
-    print "\nAdding to local copy of files for transport...";
+    print "\nAdding $filename to local copy of files for transport...";
     system( 'cp', "files/$filename", "$dir_for_files/$new_filename" );
 }
 
@@ -181,8 +180,8 @@ sub stitch_file {
             $remainder_of_line = '';
         }
         my $file_part;
-        if ( $filename_local =~ /^SNR$/ ) { # untested
-            $remainder_of_line =~ /(.*):(.*)/;
+        if ( $remainder_of_line =~ /^SNR:/ ) {
+            $remainder_of_line =~ /SNR:(.*):(.*)/;
             my ( $search, $replace ) = ( $1, $2 );
             $file_part = read_file("files/$filename_local");
             $file_part =~ s/$search/$replace/g;
