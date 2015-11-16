@@ -11,7 +11,8 @@ Use one or two arguments:
 - /system.plans - list of systems' plans
 - /files - list of files to include in those plans
 
-Features. This is mainly designed to get basic environment stuffs over to a newly provisioned VM: 
+## Features
+This is mainly designed to get basic environment stuffs over to a newly provisioned VM: 
 - Stitch together a bash_custom file.  This let's you have a hierarchy of alias files for 'all VMs' vs 'QA VMs'.  Reference are automatically added: bash_profile->bash_custom bashrc->bash_custom.
 - Copy .vimrc file.
 - Insert your ssh key into authorized hosts.
@@ -23,7 +24,7 @@ But, it will also:
 - Run any bash script
 - 'sudo -i' to root if needed (like some cP OS images)
 
-Installation.
+## Installation
 perl modules need to be installed:
 ```
 cpan -i Getopt::Long File::Slurp Net::OpenSSH Config Path::Tiny
