@@ -9,6 +9,7 @@ use Net::OpenSSH;
 chdir("../") or die "cannot change: $!\n";
 
 # i've seen sometimes sends out to err, so capture both & check error codes
+diag 'Using ./provision.pl -system 127.0.0.1 2>&1';
 my $out = `./provision.pl -system 127.0.0.1 2>&1` ;
 like( $out, qr!a tmp/provision_files!, "Text is displayed for local login: 'a tmp/provision_files'" );
 like( `echo $?`, qr/0/, "./provision.pl bash command error code success." );

@@ -10,10 +10,13 @@ use Path::Tiny qw(path);
 my $help;
 my $system;
 my $user;
+my $sudo_user;
+my $sudo_pass;
 my $ssh_key  = '';
 my $port     = '22';
 my $transfer = 1;
-my $openstack_sudo = 0;
+my $use_sudo = 0;
+my $tried_sudo = 0;
 my $mac_tar_options =  '';
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
@@ -46,8 +49,9 @@ unless ( -e "system.plans/${user}\@$system" ) {
 chomp( my @lines = read_file("system.plans/${user}\@$system") );
 foreach my $line (@lines) {
     $line =~ s/~/$ENV{HOME}/g;
-    if ( $line =~ /^OPENSTACK_SUDO:$/ ) {
-        $openstack_sudo = 1;
+    if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
+        $sudo_user = $1;
+        $use_sudo = 1;
     }
     elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
         $ssh_key = $1;
@@ -94,51 +98,72 @@ if ( $Config{osname} =~ /darwin/ ) {
 system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
 if ( $transfer ) {
-    my %opts = (
-        'user'     => $user,
-        'port'     => $port,
-        'key_path' => $ssh_key,
-    );
-    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    {
+        my %opts = (
+            'user'     => $user,
+            'port'     => $port,
+            'key_path' => $ssh_key,
+        );
+        my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
 
-    if ( $ssh->error ) {
-        print "SSH attempt failed using the key specified.  Let's try using a password:\n";
-        delete $opts{'key_path'};
-        chomp( my $pass = <STDIN> );
-        $opts{'password'} = $pass;
-        $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-        $ssh->error
-            and die "Couldn't establish SSH connection: " . $ssh->error;
-    }
+        if ( $use_sudo && $tried_sudo == 0 ) {
+            print "Trying openstack workarounds.\n";
+            $opts{'user'} = $sudo_user;
+            try_user( $sys_address_for_scp, %opts );
+            $tried_sudo = 1;
+            redo;
+        }
 
-    print "\nCopying files to destination...\n";
-    $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
-    $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
+        if ( $ssh->error ) {
+            $ssh = try_input_pass( $sys_address_for_scp, %opts );
+        }
 
-    print "\nExpanding files on destination...\n";
-    if ( $openstack_sudo ) {
-        # standard OpenSSH examples didn't work
-        my $cmd = <<'EOF';
-sudo -i
-cd
-pwd
-mv -v /home/centos/transferred_by_provision_script.tar ./
-mv -v /home/centos/provision_expand.pl ./
-perl ./provision_expand.pl
-sed -i.bak '/no-agent-forwarding/d' /root/.ssh/authorized_keys
-exit
-exit
+        print "\nCopying files to destination...\n";
+        $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
+        $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
 
-EOF
-        my @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
-    }
-    else {
-        # not OpenStack sudo, this is probably the more common use case
+        print "\nExpanding files on destination...\n";
         $ssh->system( 'perl', './provision_expand.pl' )
             or die "remote command failed: " . $ssh->error;
     }
 }
 
+sub try_user {
+    my ( $sys_address_for_scp, %opts ) = @_;
+
+    # standard OpenSSH examples didn't work
+    my $cmd = <<'EOF';
+sudo -i
+cd
+pwd
+sed -i.bak '/no-agent-forwarding/d' /root/.ssh/authorized_keys
+sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+sed -i -e 's/.*PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config
+service sshd reload
+exit
+exit
+
+EOF
+
+    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    if ( $ssh->error ) {
+        $ssh = try_input_pass( $sys_address_for_scp, %opts );
+    }
+    my @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
+}
+
+sub try_input_pass {
+    my ( $sys_address_for_scp, %opts ) = @_;
+
+    print "SSH attempt failed using the key specified. Let's try using a password:\n";
+    delete $opts{'key_path'};
+    chomp( my $pass = <STDIN> );
+    $opts{'password'} = $pass;
+    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    $ssh->error
+        and die "Couldn't establish SSH connection: " . $ssh->error;
+    return $ssh;
+}
 # tmp dir for backups and testing
 sub make_tmp_dir {
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir

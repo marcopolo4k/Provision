@@ -22,7 +22,7 @@ But, it will also:
 - Perform search and replace on any file
 - Perform the mentioned 'stitching' on any file
 - Run any bash script
-- 'sudo -i' to root if needed (like some cP OS images)
+- 'sudo -i' to root if needed (like some local cP OS images)
 
 ## Installation
 perl modules need to be installed:
@@ -35,9 +35,9 @@ The system.plans/files look something like (without the '#' comments):
 [~/provision/system.plans]$ cat userme\@demotest.server
 SSH_KEY:~/.ssh/id_rsa
 SSH_PORT:602
+ESCALATE_USER:username # Security warning: this feature logs in as named user, sudo escalates to root, enables root login
 FILE:a_file_you_want_in_homedir.txt
 FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags
-OPENSTACK_SUDO: # cludgy escalate for OpenStack VM's, this will change based on feedback
 RUN_BASH_SCRIPT:do_something_custom.sh
 STITCH_FILES:.bash_custom:bash_custom.02.linux.user
 STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
