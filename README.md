@@ -35,7 +35,6 @@ The system.plans/files look something like (without the '#' comments):
 [~/provision/system.plans]$ cat userme\@demotest.server
 SSH_KEY:~/.ssh/id_rsa
 SSH_PORT:602
-ESCALATE_USER:username # Security warning: this feature logs in as named user, sudo escalates to root, enables root login
 FILE:a_file_you_want_in_homedir.txt
 FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags
 RUN_BASH_SCRIPT:do_something_custom.sh
@@ -43,6 +42,7 @@ STITCH_FILES:.bash_custom:bash_custom.02.linux.user
 STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
 STITCH_FILES:.bash_custom:ADD_TO:alias tp='top -blah blah'
 STITCH_FILES:.bash_custom:bash_custom.anotherone:SNR:search for this:replace with this # not well tested
+ESCALATE_USER:username # Use this with caution: this feature logs in as named user, sudo escalates to root, enables root login. It handles some little-understood cases specific for cP OpenStack VM's, so the logic might be .... confusing.
 ```
 
 A couple examples of what I use currently:

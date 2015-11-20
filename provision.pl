@@ -43,6 +43,7 @@ make_tmp_dir();
 
 set_sysip_prompt() if ( $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/ );
 
+print "\nParsing system config file...\n";
 unless ( -e "system.plans/${user}\@$system" ) {
     $system = 'DEFAULT';
 }
@@ -98,59 +99,33 @@ if ( $Config{osname} =~ /darwin/ ) {
 system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
 if ( $transfer ) {
-    {
-        my %opts = (
-            'user'     => $user,
-            'port'     => $port,
-            'key_path' => $ssh_key,
-        );
-        my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    my %opts = (
+        'user'     => $user,
+        'port'     => $port,
+        'key_path' => $ssh_key,
+    );
+    my $ssh;
 
-        if ( $use_sudo && $tried_sudo == 0 ) {
-            print "Trying openstack workarounds.\n";
-            $opts{'user'} = $sudo_user;
-            try_user( $sys_address_for_scp, %opts );
-            $tried_sudo = 1;
-            redo;
-        }
-
-        if ( $ssh->error ) {
-            $ssh = try_input_pass( $sys_address_for_scp, %opts );
-        }
-
-        print "\nCopying files to destination...\n";
-        $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
-        $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
-
-        print "\nExpanding files on destination...\n";
-        $ssh->system( 'perl', './provision_expand.pl' )
-            or die "remote command failed: " . $ssh->error;
+    if ( $use_sudo ) {
+        print "\nDoing openstack workarounds.
+It's kinda brute, but this will copy all the files as sudo user first, then do it again for root...\n";
+        escalate( $sudo_user, $sys_address_for_scp, %opts );
     }
-}
 
-sub try_user {
-    my ( $sys_address_for_scp, %opts ) = @_;
-
-    # standard OpenSSH examples didn't work
-    my $cmd = <<'EOF';
-sudo -i
-cd
-pwd
-sed -i.bak '/no-agent-forwarding/d' /root/.ssh/authorized_keys
-sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-sed -i -e 's/.*PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config
-service sshd reload
-exit
-exit
-
-EOF
-
-    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+    print "Logging in with user $user...\n";
+    $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
     if ( $ssh->error ) {
         $ssh = try_input_pass( $sys_address_for_scp, %opts );
     }
-    my @capture = $ssh->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
+    transfer_expand_files( $ssh );
 }
+
+## Cleanup, unless in testing mode
+if ( $transfer ) {
+    system( 'rm', '-rf', $dir_for_files )   if ($transfer);
+    system( 'rm', '-rf', 'totransfer.tar' ) if ($transfer);
+}
+
 
 sub try_input_pass {
     my ( $sys_address_for_scp, %opts ) = @_;
@@ -159,12 +134,53 @@ sub try_input_pass {
     delete $opts{'key_path'};
     chomp( my $pass = <STDIN> );
     $opts{'password'} = $pass;
+    print "Logging in with user $user...\n";
     my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
     $ssh->error
         and die "Couldn't establish SSH connection: " . $ssh->error;
     return $ssh;
 }
-# tmp dir for backups and testing
+
+sub escalate {
+    my ( $sudo_user_local, $sys_address_for_scp, %opts_sudo ) = @_;
+
+    $opts_sudo{'user'} = $sudo_user_local;
+    my $ssh_sudo = Net::OpenSSH->new( $sys_address_for_scp, %opts_sudo );
+    if ( $ssh_sudo->error ) {
+        $ssh_sudo = try_input_pass( $sys_address_for_scp, %opts_sudo );
+    }
+    transfer_expand_files( $ssh_sudo );
+
+    # standard OpenSSH examples didn't work
+    my $cmd = <<"EOF";
+sudo -i
+cd
+pwd
+sed -i.bak '/no-agent-forwarding/d' /root/.ssh/authorized_keys
+sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+sed -i -e 's/.*PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config
+tail -1 /home/$sudo_user_local/.ssh/authorized_keys >> /root/.ssh/authorized_keys
+service sshd reload
+exit
+exit
+
+EOF
+    my @capture = $ssh_sudo->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
+}
+
+sub transfer_expand_files {
+    my $ssh = shift;
+
+    print "\nCopying files to destination...\n";
+    $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
+    $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
+
+    print "\nExpanding files on destination...\n";
+    $ssh->system( 'perl', './provision_expand.pl' )
+        or die "remote command failed: " . $ssh->error;
+}
+
+# tmp dir for backups and unit tests
 sub make_tmp_dir {
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir
         system( 'rm', '-rf', "${dir_for_files}.bak" );
@@ -227,10 +243,4 @@ sub help {
     print "/system.plans - list of systems' plans\n";
     print "/files - list of files to include in those plans\n\n";
     exit;
-}
-
-# cleanup
-if ( $transfer ) {
-    system( 'rm', '-rf', $dir_for_files )   if ($transfer);
-    system( 'rm', '-rf', 'totransfer.tar' ) if ($transfer);
 }
