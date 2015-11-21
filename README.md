@@ -1,7 +1,7 @@
 Provision
 ==========
 
-Script to provision files to CentOS VM's
+Script to provision files to linux VM's. Developed on Mac->CentOS.
 
 # Usage
 Use one or two arguments:
@@ -13,16 +13,15 @@ Use one or two arguments:
 
 ## Features
 This is mainly designed to get basic environment stuffs over to a newly provisioned VM: 
-- Stitch together a bash_custom file.  This let's you have a hierarchy of alias files for 'all VMs' vs 'QA VMs'.  Reference are automatically added: bash_profile->bash_custom bashrc->bash_custom.
-- Copy .vimrc file.
+- Stitch together a bash_custom file.  This let's you have a hierarchy of alias files for 'all VMs' vs 'QA VMs'.  References are automatically added: bash_profile->bash_custom bashrc->bash_custom.
+- Copy .vimrc or any file to home directory.
 - Insert your ssh key into authorized hosts.
 
 But, it will also:
-- Copy any file you specify over to the home dir
-- Perform search and replace on any file
-- Perform the mentioned 'stitching' on any file
-- Run any bash script
-- 'sudo -i' to root if needed (like some local cP OS images)
+- Perform search and replace on any file copied.
+- Perform the mentioned 'stitching' on any file.
+- Run any bash script.
+- 'sudo -i' to root if needed (like some local cP OS images).
 
 ## Installation
 perl modules need to be installed:
@@ -45,30 +44,5 @@ STITCH_FILES:.bash_custom:bash_custom.anotherone:SNR:search for this:replace wit
 ESCALATE_USER:username # Use this with caution: this feature logs in as named user, sudo escalates to root, enables root login. It handles some little-understood cases specific for cP OpenStack VM's, so the logic might be .... confusing.
 ```
 
-A couple examples of what I use currently:
-```
-[~/provision/system.plans]$ cat root\@CPANEL 
-SSH_KEY:~/.ssh/petvms
-STITCH_FILES:.bash_custom:bash_custom.01.linux.root
-STITCH_FILES:.bash_custom:bash_custom.02.linux.user
-STITCH_FILES:.bash_custom:bash_custom.03.services
-STITCH_FILES:.bash_custom:bash_custom.04.qa.alias
-STITCH_FILES:.bash_custom:bash_custom.04.qa.promptps1
-STITCH_FILES:.bash_custom:bash_custom.05.cpanel
-STITCH_FILES:.bash_custom:bash_custom.05.cpanel.promptps1
-FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags
-RUN_BASH_SCRIPT:cpvmsetup_fast.sh
-FILE:cpvmsetup_slow.pl
-```
-```
-[~/provision/files]$ cat bash_custom.02.linux.user 
-# User
-# Linux aliases, variables, and functions
-
-export HISTTIMEFORMAT="%d/%m/%y %T "
-
-alias diff='diff -y --suppress-common-lines'; alias less='\less -IR'; alias grep='grep --color'; 
-alias ls='\ls -F --color';
-alias lf='echo `\ls -lrt|\tail -1|awk "{print \\$9}"`'; alias lf2='echo `\ls -lrt|\tail -2|awk "{print \\$9}"|head -1`';
-alias perms=awk\ \'BEGIN\{dir\=DIR?DIR:ENVIRON[\"PWD\"]\;l=split\(dir\,parts,\"/\"\)\;last=\"\"\;for\(i=1\;i\<l+1\;i++\)\{d=last\"/\"parts\[i\]\;gsub\(\"//\",\"/\",d\)\;system\(\"stat\ --printf\ \\\"Thu\\\t%u\\\t%g\\\t\\\"\ \\\"\"d\"\\\"\;\ echo\ -n\ \\\"\ \\\"\;ls\ -ld\ \\\"\"d\"\\\"\"\)\;last=d\}\}\'
-```
+Examples of what I use can be found inside our wiki:
+https://cpanel.wiki/display/~marco/Provision+Environment+to+CentOS+VM
