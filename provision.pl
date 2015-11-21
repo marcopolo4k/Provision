@@ -12,12 +12,13 @@ my $system;
 my $user;
 my $sudo_user;
 my $sudo_pass;
-my $ssh_key  = '';
-my $port     = '22';
-my $transfer = 1;
-my $use_sudo = 0;
-my $tried_sudo = 0;
-my $mac_tar_options =  '';
+my $ssh_key         = '';
+my $port            = '22';
+my $transfer        = 1;
+my $use_sudo        = 0;
+my $tried_sudo      = 0;
+my $escalated       = 0;
+my $mac_tar_options = '';
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
     "system=s"  => \$system,
@@ -52,7 +53,7 @@ foreach my $line (@lines) {
     $line =~ s/~/$ENV{HOME}/g;
     if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
         $sudo_user = $1;
-        $use_sudo = 1;
+        $use_sudo  = 1;
     }
     elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
         $ssh_key = $1;
@@ -68,21 +69,22 @@ foreach my $line (@lines) {
         my $remainder_of_line = $1;
         if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    # warning: can't use colons in the regex
             my ( $filename, $search, $replace ) = ( $1, $2, $3 );
-            file_copy_to_tmp_homedir($filename, '');
+            file_copy_to_tmp_homedir( $filename, '' );
             replace_text_in_file( $dir_for_files, $filename, $search, $replace );
         }
-        else { # default files going to user's home dir on destination
-            file_copy_to_tmp_homedir($remainder_of_line, '');
+        else {                                                 # default files going to user's home dir on destination
+            file_copy_to_tmp_homedir( $remainder_of_line, '' );
         }
     }
     elsif ( $line =~ /^STITCH_FILES:(.+?):([^:]+)(:(.+))?/ ) {
+
         # $filename_dest, $filename_local (or a directive), $remainder_of_line
         stitch_file( $1, $2, $4 );
     }
     elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
-        my $filename = $1;
+        my $filename       = $1;
         my $change_name_to = 'RUN_BASH_' . $filename;
-        file_copy_to_tmp_homedir($filename, $change_name_to);
+        file_copy_to_tmp_homedir( $filename, $change_name_to );
     }
     else {    # should be nothing
         print "The system file has an (improperly|un)labeled entry:\n";
@@ -94,11 +96,11 @@ foreach my $line (@lines) {
 
 print "\n\nCreating tar of files for transport...\n";
 if ( $Config{osname} =~ /darwin/ ) {
-    $mac_tar_options =  '--disable-copyfile';
+    $mac_tar_options = '--disable-copyfile';
 }
 system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
-if ( $transfer ) {
+if ($transfer) {
     my %opts = (
         'user'     => $user,
         'port'     => $port,
@@ -106,69 +108,95 @@ if ( $transfer ) {
     );
     my $ssh;
 
-    if ( $use_sudo ) {
-        print "\nDoing openstack workarounds.
-It's kinda brute, but this will copy all the files as sudo user first, then do it again for root...\n";
-        escalate( $sudo_user, $sys_address_for_scp, %opts );
-    }
-
     print "Logging in with user $user...\n";
     $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
     if ( $ssh->error ) {
-        $ssh = try_input_pass( $sys_address_for_scp, %opts );
+        if ($use_sudo) {
+            print "\nThe default user couldn't log in, so we'll sudo the workaround.
+It's kinda brute, but this will copy all the files as sudo user first, then do it again for root.
+This means sudo user will run any custom scripts...\n\n";
+            $escalated = escalate( $sudo_user, $sys_address_for_scp, %opts );
+            if ($escalated) {
+                print "\nNow that root has a key, logging in with $user...\n";
+                $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+                $ssh->error
+                    and print "Couldn't establish SSH connection: " . $ssh->error;
+            }
+        }
+
+        if ( !$escalated ) {
+            $ssh = try_input_pass( $sys_address_for_scp, %opts );
+        }
     }
-    transfer_expand_files( $ssh );
+    if ($ssh) {
+        transfer_and_expand_files($ssh);
+    }
+    else {
+        die "All SSH attempts failed. Please try again.\n";
+    }
 }
 
 ## Cleanup, unless in testing mode
-if ( $transfer ) {
-    system( 'rm', '-rf', $dir_for_files )   if ($transfer);
-    system( 'rm', '-rf', 'totransfer.tar' ) if ($transfer);
+if ($transfer) {
+    system(qq{ rm -rf $dir_for_files }) if ($transfer);
+    system(q{ rm -rf totransfer.tar })  if ($transfer);
 }
 
-
 sub try_input_pass {
-    my ( $sys_address_for_scp, %opts ) = @_;
+    my ( $sys_address_for_scp, %opts_local ) = @_;
 
-    print "SSH attempt failed using the key specified. Let's try using a password:\n";
-    delete $opts{'key_path'};
+    print "SSH attempt for $opts_local{'user'} failed using the key specified. Let's try using a password:\n";
+    delete $opts_local{'key_path'};
     chomp( my $pass = <STDIN> );
-    $opts{'password'} = $pass;
-    print "Logging in with user $user...\n";
-    my $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-    $ssh->error
-        and die "Couldn't establish SSH connection: " . $ssh->error;
-    return $ssh;
+    $opts_local{'password'} = $pass;
+
+    print "Logging in with user $opts_local{'user'}...\n";
+    my $ssh_local = Net::OpenSSH->new( $sys_address_for_scp, %opts_local );
+    if ( $ssh_local->error ) {
+        print "Couldn't establish SSH connection: " . $ssh_local->error . "\n";
+        return 0;
+    }
+    else {
+        return $ssh_local;
+    }
 }
 
 sub escalate {
     my ( $sudo_user_local, $sys_address_for_scp, %opts_sudo ) = @_;
 
     $opts_sudo{'user'} = $sudo_user_local;
+    print "Logging in with user $sudo_user_local...\n";
     my $ssh_sudo = Net::OpenSSH->new( $sys_address_for_scp, %opts_sudo );
     if ( $ssh_sudo->error ) {
         $ssh_sudo = try_input_pass( $sys_address_for_scp, %opts_sudo );
     }
-    transfer_expand_files( $ssh_sudo );
+    if ($ssh_sudo) {
+        transfer_and_expand_files($ssh_sudo);
 
-    # standard OpenSSH examples didn't work
-    my $cmd = <<"EOF";
+        # standard OpenSSH examples didn't work
+        my $cmd = <<"EOF";
 sudo -i
 cd
 pwd
 sed -i.bak '/no-agent-forwarding/d' /root/.ssh/authorized_keys
 sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
 sed -i -e 's/.*PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config
-tail -1 /home/$sudo_user_local/.ssh/authorized_keys >> /root/.ssh/authorized_keys
+tail -1 /home/$sudo_user_local/.ssh/authorized_keys >> /$user/.ssh/authorized_keys
 service sshd reload
 exit
 exit
 
 EOF
-    my @capture = $ssh_sudo->capture( {tty => 1, stdin_data => "$cmd\n" }, '' );
+        my @capture = $ssh_sudo->capture( { tty => 1, stdin_data => "$cmd\n" }, '' );
+        return 1;
+    }
+    else {
+        print "Sudo user was not able to log in. Moving on...\n";
+        return 0;
+    }
 }
 
-sub transfer_expand_files {
+sub transfer_and_expand_files {
     my $ssh = shift;
 
     print "\nCopying files to destination...\n";
@@ -190,7 +218,7 @@ sub make_tmp_dir {
 }
 
 sub file_copy_to_tmp_homedir {
-    my ( $filename, $change_name_to ) = ( @_ );
+    my ( $filename, $change_name_to ) = (@_);
     my $new_filename;
     if ( $change_name_to eq '' ) {
         $new_filename = $filename;
@@ -203,7 +231,8 @@ sub file_copy_to_tmp_homedir {
 }
 
 sub set_sysip_prompt {
-    open( my $fh, '>>', "$dir_for_files/.bash_custom" ) or die "At least one .bash_custom system file is required.  Couldn't open file $!";
+    open( my $fh, '>>', "$dir_for_files/.bash_custom" )
+        or die "At least one .bash_custom system file is required.  Couldn't open file $!";
     print $fh "hostip=$sys_address_for_scp\n";
 }
 
@@ -216,25 +245,24 @@ sub replace_text_in_file {
 }
 
 sub stitch_file {
-        my ( $filename_dest, $filename_local, $remainder_of_line ) = ( @_ );
-        if ( !defined $remainder_of_line || $remainder_of_line =~ /^\s+$/ ) {
-            $remainder_of_line = '';
-        }
-        my $file_part;
-        if ( $remainder_of_line =~ /^SNR:/ ) {
-            $remainder_of_line =~ /SNR:(.*):(.*)/;
-            my ( $search, $replace ) = ( $1, $2 );
-            $file_part = read_file("files/$filename_local");
-            $file_part =~ s/$search/$replace/g;
-        }
-        elsif ( $filename_local =~ /^ADD_TO$/ ) {
-            $file_part = $remainder_of_line;
-        }
-        else {
-            $file_part = read_file("files/$filename_local");
-        }
-        write_file( "$dir_for_files/$filename_dest", { append => 1 }, "\n# $filename_local\n" . $file_part );
-
+    my ( $filename_dest, $filename_local, $remainder_of_line ) = (@_);
+    if ( !defined $remainder_of_line || $remainder_of_line =~ /^\s+$/ ) {
+        $remainder_of_line = '';
+    }
+    my $file_part;
+    if ( $remainder_of_line =~ /^SNR:/ ) {
+        $remainder_of_line =~ /SNR:(.*):(.*)/;
+        my ( $search, $replace ) = ( $1, $2 );
+        $file_part = read_file("files/$filename_local");
+        $file_part =~ s/$search/$replace/g;
+    }
+    elsif ( $filename_local =~ /^ADD_TO$/ ) {
+        $file_part = $remainder_of_line;
+    }
+    else {
+        $file_part = read_file("files/$filename_local");
+    }
+    write_file( "$dir_for_files/$filename_dest", { append => 1 }, "\n# $filename_local\n" . $file_part );
 }
 
 sub help {
