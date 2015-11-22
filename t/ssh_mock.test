@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+require '../provision.pl';
+
+use Test::More 'no_plan';
+
+# ok( provision::main(), "it worked" );
+
+no warnings 'redefine';
+local *$provision::user='MOCK_USER';
+ok( provision::transfer(), "it worked" );
+
+done_testing();

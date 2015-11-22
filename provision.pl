@@ -1,4 +1,6 @@
 #!/usr/bin/perl
+package provision;
+
 use strict;
 use warnings;
 use Getopt::Long;
@@ -9,45 +11,61 @@ use Path::Tiny qw(path);
 
 my $help;
 my $system;
+my $sys_address_for_scp;
 my $user;
 my $sudo_user;
 my $sudo_pass;
 my $ssh_key         = '';
 my $port            = '22';
 my $transfer        = 1;
-my $default_user        = 1; # try default user before sudo user
+my $default_user    = 1; # try default user before sudo user
 my $use_sudo        = 0;
 my $tried_sudo      = 0;
 my $escalated       = 0;
 my $mac_tar_options = '';
-my $dir_for_files = 'tmp/provision_files';
+my $dir_for_files   = 'tmp/provision_files';
 
-help() if ( @ARGV < 1 or 5 < @ARGV );
-GetOptions(
-    "system=s"  => \$system,
-    "user=s"    => \$user,
-    "transfer!" => \$transfer,
-    "defuser!" => \$default_user,
-    "help"      => \$help
-) or die("Error in command line arguments\n");
-help() if ( defined $help );
-$system = $ARGV[0] if ( !defined $system );
-my $sys_address_for_scp = $system;
+exit main() unless caller();
 
-if ( !defined $user || $user eq '' ) {
-    if ( defined $ARGV[1] && $ARGV[1] !~ /\./ ) {
-        $user = $ARGV[1];
+sub main {
+    help() if ( @ARGV < 1 or 5 < @ARGV );
+    GetOptions(
+        "system=s"  => \$system,
+        "user=s"    => \$user,
+        "transfer!" => \$transfer,
+        "defuser!"  => \$default_user,
+        "help"      => \$help
+    ) or die("Error in command line arguments\n");
+    help() if ( defined $help );
+    $system = $ARGV[0] if ( !defined $system );
+    $sys_address_for_scp = $system;
+
+    if ( !defined $user || $user eq '' ) {
+        if ( defined $ARGV[1] && $ARGV[1] !~ /\./ ) {
+            $user = $ARGV[1];
+        }
+        else {
+            $user = 'root';
+        }
     }
-    else {
-        $user = 'root';
+
+    make_tmp_dir($dir_for_files); # for backups and unit tests
+
+    set_sysip_prompt() if $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/;
+
+    parse_config();
+
+    create_tar_file();
+
+    if ($transfer) { # some testing avoids this
+        transfer();
+        cleanup();
     }
+
+    return 0
 }
 
-make_tmp_dir($dir_for_files);
 
-set_sysip_prompt() if ( $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/ );
-
-parse_config();
 sub parse_config {
     print "\nParsing system config file...\n";
     unless ( -e "system.plans/${user}\@$system" ) {
@@ -100,7 +118,6 @@ sub parse_config {
     }
 }
 
-create_tar_file();
 sub create_tar_file {
     print "\n\nCreating tar of files for transport...\n";
     if ( $Config{osname} =~ /darwin/ ) {
@@ -109,9 +126,6 @@ sub create_tar_file {
     system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 }
 
-if ($transfer) {
-    transfer();
-}
 sub transfer {
     my %opts = (
         'user'     => $user,
@@ -155,13 +169,9 @@ This means sudo user will run any custom scripts...\n\n";
     }
 }
 
-## Cleanup, unless in testing mode
-cleanup();
 sub cleanup {
-    if ($transfer) {
-        system(qq{ rm -rf $dir_for_files }) if ($transfer);
-        system(q{ rm -rf totransfer.tar })  if ($transfer);
-    }
+    system(qq{ rm -rf $dir_for_files }) if ($transfer);
+    system(q{ rm -rf totransfer.tar })  if ($transfer);
 }
 
 sub check_ssh_connection {
@@ -249,7 +259,6 @@ sub transfer_and_expand_files {
         or die "remote command failed: " . $ssh->error;
 }
 
-# tmp dir for backups and unit tests
 sub make_tmp_dir {
     my $dir_for_files = shift;
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir
