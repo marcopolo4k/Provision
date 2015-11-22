@@ -9,7 +9,7 @@ bash_custom_refs();
 system( 'tar', '-C', $ENV{HOME}, '-xvf',
     "$ENV{HOME}/transferred_by_provision_script.tar" );
 
-chomp( my @files = grep { !/^\.*$/ } `\ls -a $dir_for_files` );
+chomp( my @files = grep { !/^\.*$/ } `ls -a $dir_for_files` );
 for my $file (@files) {
     if ( $file =~ /ssh_key/ ) {
         authorize_key($file);

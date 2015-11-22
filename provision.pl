@@ -15,6 +15,7 @@ my $sudo_pass;
 my $ssh_key         = '';
 my $port            = '22';
 my $transfer        = 1;
+my $default_user        = 1; # try default user before sudo user
 my $use_sudo        = 0;
 my $tried_sudo      = 0;
 my $escalated       = 0;
@@ -24,6 +25,7 @@ GetOptions(
     "system=s"  => \$system,
     "user=s"    => \$user,
     "transfer!" => \$transfer,
+    "defuser!" => \$default_user,
     "help"      => \$help
 ) or die("Error in command line arguments\n");
 help() if ( defined $help );
@@ -107,10 +109,16 @@ if ($transfer) {
         'key_path' => $ssh_key,
     );
     my $ssh;
+    my $connected;
 
-    print "Logging in with user $user...\n";
-    $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-    if ( $ssh->error ) {
+    if ( $default_user ) {
+        print "Logging in with user $user...\n";
+        $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+        $ssh->error
+            and print "Couldn't establish SSH connection: " . $ssh->error;
+        $connected = check_ssh_connection( $user, $ssh );
+    }
+    if ( ! $connected ) {
         if ($use_sudo) {
             print "\nThe default user couldn't log in, so we'll sudo the workaround.
 It's kinda brute, but this will copy all the files as sudo user first, then do it again for root.
@@ -124,11 +132,12 @@ This means sudo user will run any custom scripts...\n\n";
             }
         }
 
-        if ( !$escalated ) {
+        if ( ! $escalated ) {
             $ssh = try_input_pass( $sys_address_for_scp, %opts );
         }
+        $connected = check_ssh_connection( $user, $ssh );
     }
-    if ($ssh) {
+    if ($connected) {
         transfer_and_expand_files($ssh);
     }
     else {
@@ -140,6 +149,23 @@ This means sudo user will run any custom scripts...\n\n";
 if ($transfer) {
     system(qq{ rm -rf $dir_for_files }) if ($transfer);
     system(q{ rm -rf totransfer.tar })  if ($transfer);
+}
+
+sub check_ssh_connection {
+    my ( $user_local, $ssh_local ) = @_;
+
+    chomp( my $me = $ssh_local->capture("whoami") );
+    $ssh_local->error and
+      print "Remote command failed: " . $ssh_local->error . "\n";
+
+    if ( $me eq $user_local ) {
+        print "Remote connection was set up properly...\n";
+        return 1;
+    }
+    else {
+        print "Remote connection was not set up properly:\n$me\n";
+        return 0;
+    }
 }
 
 sub try_input_pass {
@@ -167,10 +193,12 @@ sub escalate {
     $opts_sudo{'user'} = $sudo_user_local;
     print "Logging in with user $sudo_user_local...\n";
     my $ssh_sudo = Net::OpenSSH->new( $sys_address_for_scp, %opts_sudo );
-    if ( $ssh_sudo->error ) {
+    my $connected = check_ssh_connection( $sudo_user_local, $ssh_sudo );
+    if ( ! $connected ) { # tested, this does produce an error (always? todo) 
         $ssh_sudo = try_input_pass( $sys_address_for_scp, %opts_sudo );
     }
-    if ($ssh_sudo) {
+    $connected = check_ssh_connection( $sudo_user_local, $ssh_sudo );
+    if ($connected) {
         transfer_and_expand_files($ssh_sudo);
 
         # standard OpenSSH examples didn't work
@@ -270,5 +298,7 @@ sub help {
     print "provision.pl <system_name|ip_address> [username]\n\n";
     print "/system.plans - list of systems' plans\n";
     print "/files - list of files to include in those plans\n\n";
+    print "-nodefuser = no default user - don't try the main username before sudo user\n";
+    print "-notransfer = only create files locally and leave them there (for testing)\n\n";
     exit;
 }
