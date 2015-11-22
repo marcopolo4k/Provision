@@ -20,6 +20,8 @@ my $use_sudo        = 0;
 my $tried_sudo      = 0;
 my $escalated       = 0;
 my $mac_tar_options = '';
+my $dir_for_files = 'tmp/provision_files';
+
 help() if ( @ARGV < 1 or 5 < @ARGV );
 GetOptions(
     "system=s"  => \$system,
@@ -41,68 +43,76 @@ if ( !defined $user || $user eq '' ) {
     }
 }
 
-my $dir_for_files = 'tmp/provision_files';
-make_tmp_dir();
+make_tmp_dir($dir_for_files);
 
 set_sysip_prompt() if ( $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/ );
 
-print "\nParsing system config file...\n";
-unless ( -e "system.plans/${user}\@$system" ) {
-    $system = 'DEFAULT';
-}
-chomp( my @lines = read_file("system.plans/${user}\@$system") );
-foreach my $line (@lines) {
-    $line =~ s/~/$ENV{HOME}/g;
-    if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
-        $sudo_user = $1;
-        $use_sudo  = 1;
+parse_config();
+sub parse_config {
+    print "\nParsing system config file...\n";
+    unless ( -e "system.plans/${user}\@$system" ) {
+        $system = 'DEFAULT';
     }
-    elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
-        $ssh_key = $1;
-        system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
-        if ( $ssh_key =~ /(.*)\.pub$/ ) {    # never used unless user messes up, but also not tested
+    chomp( my @lines = read_file("system.plans/${user}\@$system") );
+    foreach my $line (@lines) {
+        $line =~ s/~/$ENV{HOME}/g;
+        if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
+            $sudo_user = $1;
+            $use_sudo  = 1;
+        }
+        elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
             $ssh_key = $1;
+            system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
+            if ( $ssh_key =~ /(.*)\.pub$/ ) {    # never used unless user messes up, but also not tested
+                $ssh_key = $1;
+            }
         }
-    }
-    elsif ( $line =~ /^SSH_PORT:(\d*)/ ) {
-        $port = $1;
-    }
-    elsif ( $line =~ /^FILE:(.*)/ ) {        # warning: can't use colons in the regex
-        my $remainder_of_line = $1;
-        if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    # warning: can't use colons in the regex
-            my ( $filename, $search, $replace ) = ( $1, $2, $3 );
-            file_copy_to_tmp_homedir( $filename, '' );
-            replace_text_in_file( $dir_for_files, $filename, $search, $replace );
+        elsif ( $line =~ /^SSH_PORT:(\d*)/ ) {
+            $port = $1;
         }
-        else {                                                 # default files going to user's home dir on destination
-            file_copy_to_tmp_homedir( $remainder_of_line, '' );
+        elsif ( $line =~ /^FILE:(.*)/ ) {        # warning: can't use colons in the regex
+            my $remainder_of_line = $1;
+            if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    # warning: can't use colons in the regex
+                my ( $filename, $search, $replace ) = ( $1, $2, $3 );
+                file_copy_to_tmp_homedir( $filename, '' );
+                replace_text_in_file( $dir_for_files, $filename, $search, $replace );
+            }
+            else {                                                 # default files going to user's home dir on destination
+                file_copy_to_tmp_homedir( $remainder_of_line, '' );
+            }
         }
-    }
-    elsif ( $line =~ /^STITCH_FILES:(.+?):([^:]+)(:(.+))?/ ) {
+        elsif ( $line =~ /^STITCH_FILES:(.+?):([^:]+)(:(.+))?/ ) {
 
-        # $filename_dest, $filename_local (or a directive), $remainder_of_line
-        stitch_file( $1, $2, $4 );
-    }
-    elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
-        my $filename       = $1;
-        my $change_name_to = 'zzRUN_BASH_' . $filename; # scripts to run handled last
-        file_copy_to_tmp_homedir( $filename, $change_name_to );
-    }
-    else {    # should be nothing
-        print "The system file has an (improperly|un)labeled entry:\n";
-        print "[$line]\n";
-        print "Please see docs or label all entries\n";
-        help();
+            # $filename_dest, $filename_local (or a directive), $remainder_of_line
+            stitch_file( $1, $2, $4 );
+        }
+        elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
+            my $filename       = $1;
+            my $change_name_to = 'zzRUN_BASH_' . $filename; # scripts to run handled last
+            file_copy_to_tmp_homedir( $filename, $change_name_to );
+        }
+        else {    # should be nothing
+            print "The system file has an (improperly|un)labeled entry:\n";
+            print "[$line]\n";
+            print "Please see docs or label all entries\n";
+            help();
+        }
     }
 }
 
-print "\n\nCreating tar of files for transport...\n";
-if ( $Config{osname} =~ /darwin/ ) {
-    $mac_tar_options = '--disable-copyfile';
+create_tar_file();
+sub create_tar_file {
+    print "\n\nCreating tar of files for transport...\n";
+    if ( $Config{osname} =~ /darwin/ ) {
+        $mac_tar_options = '--disable-copyfile';
+    }
+    system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 }
-system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
 
 if ($transfer) {
+    transfer();
+}
+sub transfer {
     my %opts = (
         'user'     => $user,
         'port'     => $port,
@@ -146,9 +156,12 @@ This means sudo user will run any custom scripts...\n\n";
 }
 
 ## Cleanup, unless in testing mode
-if ($transfer) {
-    system(qq{ rm -rf $dir_for_files }) if ($transfer);
-    system(q{ rm -rf totransfer.tar })  if ($transfer);
+cleanup();
+sub cleanup {
+    if ($transfer) {
+        system(qq{ rm -rf $dir_for_files }) if ($transfer);
+        system(q{ rm -rf totransfer.tar })  if ($transfer);
+    }
 }
 
 sub check_ssh_connection {
@@ -238,6 +251,7 @@ sub transfer_and_expand_files {
 
 # tmp dir for backups and unit tests
 sub make_tmp_dir {
+    my $dir_for_files = shift;
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir
         system( 'rm', '-rf', "${dir_for_files}.bak" );
         system( 'mv', '-v', $dir_for_files, "${dir_for_files}.bak" );
