@@ -9,12 +9,12 @@ bash_custom_refs();
 system( 'tar', '-C', $ENV{HOME}, '-xvf',
     "$ENV{HOME}/transferred_by_provision_script.tar" );
 
-chomp( my @files = grep { !/^\.*$/ } `ls -a $dir_for_files` );
+chomp( my @files = grep { !/^\.*$/ } `\ls -a $dir_for_files` );
 for my $file (@files) {
     if ( $file =~ /ssh_key/ ) {
         authorize_key($file);
     }
-    elsif ( $file =~ /^RUN_BASH_(.*)/ ) {
+    elsif ( $file =~ /^zzRUN_BASH_(.*)/ ) {
         system( "sh $dir_for_files/$file" );
     }
     else {    # add non-default files above here
@@ -66,3 +66,4 @@ sub authorize_key {
 system( 'rm', '-rf', "$dir_for_files" );
 system( 'rm', "$ENV{HOME}/transferred_by_provision_script.tar" );
 system( 'rm', "$ENV{HOME}/provision_expand.pl" );
+

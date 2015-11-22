@@ -83,7 +83,7 @@ foreach my $line (@lines) {
     }
     elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
         my $filename       = $1;
-        my $change_name_to = 'RUN_BASH_' . $filename;
+        my $change_name_to = 'zzRUN_BASH_' . $filename; # scripts to run handled last
         file_copy_to_tmp_homedir( $filename, $change_name_to );
     }
     else {    # should be nothing
