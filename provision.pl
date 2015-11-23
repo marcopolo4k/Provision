@@ -152,7 +152,8 @@ This means sudo user will run any custom scripts...\n\n";
                 print "\nNow that root has a key, logging in with $user...\n";
                 $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
                 $ssh->error
-                    and print "Couldn't establish SSH connection: " . $ssh->error;
+                    and print "Couldn't establish SSH connection: " . $ssh->error
+                    and $escalated = 0;
             }
         }
 
@@ -239,6 +240,8 @@ exit
 
 EOF
         my @capture = $ssh_sudo->capture( { tty => 1, stdin_data => "$cmd\n" }, '' );
+        print "(debug) capture array:\n";
+        print "(debug) $_\n" for @capture;
         return 1;
     }
     else {
