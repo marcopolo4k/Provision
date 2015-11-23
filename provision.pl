@@ -136,7 +136,7 @@ sub transfer {
     my $connected;
 
     if ( $default_user ) {
-        print "Logging in with user $user...\n";
+        print "\nLogging in with user $user...\n";
         $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
         $ssh->error
             and print "Couldn't establish SSH connection: " . $ssh->error;
@@ -153,6 +153,7 @@ This means sudo user will run any custom scripts...\n\n";
                 $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
                 $ssh->error
                     and print "Couldn't establish SSH connection: " . $ssh->error
+                    # and $sudo_available = 1; # TODO set global empty
                     and $escalated = 0;
             }
         }
@@ -160,6 +161,7 @@ This means sudo user will run any custom scripts...\n\n";
         if ( ! $escalated ) {
             $ssh = try_input_pass( $sys_address_for_scp, %opts );
         }
+
         $connected = check_ssh_connection( $user, $ssh );
     }
     if ($connected) {
@@ -178,7 +180,15 @@ sub cleanup {
 sub check_ssh_connection {
     my ( $user_local, $ssh_local ) = @_;
 
-    chomp( my $me = $ssh_local->capture("whoami") );
+    if ( (!defined $ssh_local) || ($ssh_local == 0) ){ # TODO refactor
+        print "Remote connection was not set up properly.\n";
+        return 0;
+    }
+    my $me = $ssh_local->capture("whoami");
+    if ( ! defined $me ) {
+        $me = '';
+    }
+    chomp( $me );
     $ssh_local->error and
       print "Remote command failed: " . $ssh_local->error . "\n";
 
@@ -240,8 +250,6 @@ exit
 
 EOF
         my @capture = $ssh_sudo->capture( { tty => 1, stdin_data => "$cmd\n" }, '' );
-        print "(debug) capture array:\n";
-        print "(debug) $_\n" for @capture;
         return 1;
     }
     else {
