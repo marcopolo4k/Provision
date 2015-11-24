@@ -10,6 +10,8 @@ use Config;
 use Path::Tiny qw(path);
 
 my $help;
+my $verbose         = '';
+my $v               = '';
 my $system;
 my $sys_address_for_scp;
 my $user;
@@ -34,11 +36,20 @@ sub main {
         "user=s"    => \$user,
         "transfer!" => \$transfer,
         "defuser!"  => \$default_user,
+        "verbose"   => \$verbose,
         "help"      => \$help
     ) or die("Error in command line arguments\n");
     help() if ( defined $help );
-    $system = $ARGV[0] if ( !defined $system );
+    if ( !defined $system ){
+        if ( !defined $ARGV[0] || $ARGV[0] eq '' ){
+            help();
+        }
+        else {
+            $system = $ARGV[0];
+        };
+    }
     $sys_address_for_scp = $system;
+    $v = 'v' if $verbose;
 
     if ( !defined $user || $user eq '' ) {
         if ( defined $ARGV[1] && $ARGV[1] !~ /\./ ) {
@@ -67,13 +78,14 @@ sub main {
 
 
 sub parse_config {
-    print "\nParsing system config file...\n";
+    print "\nParsing system config file...\n" if $verbose;
     unless ( -e "system.plans/${user}\@$system" ) {
         $system = 'DEFAULT';
     }
     chomp( my @lines = read_file("system.plans/${user}\@$system") );
     foreach my $line (@lines) {
         $line =~ s/~/$ENV{HOME}/g;
+        # so can't really use colons in any of these features
         if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
             $sudo_user = $1;
             $use_sudo  = 1;
@@ -81,21 +93,23 @@ sub parse_config {
         elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
             $ssh_key = $1;
             system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
-            if ( $ssh_key =~ /(.*)\.pub$/ ) {    # never used unless user messes up, but also not tested
+            # this pub check isn't used unless user messes up, but it's not well tested
+            if ( $ssh_key =~ /(.*)\.pub$/ ) {
                 $ssh_key = $1;
             }
         }
         elsif ( $line =~ /^SSH_PORT:(\d*)/ ) {
             $port = $1;
         }
-        elsif ( $line =~ /^FILE:(.*)/ ) {        # warning: can't use colons in the regex
+        elsif ( $line =~ /^FILE:(.*)/ ) {
             my $remainder_of_line = $1;
-            if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    # warning: can't use colons in the regex
+            if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    
                 my ( $filename, $search, $replace ) = ( $1, $2, $3 );
                 file_copy_to_tmp_homedir( $filename, '' );
                 replace_text_in_file( $dir_for_files, $filename, $search, $replace );
             }
-            else {                                                 # default files going to user's home dir on destination
+            # default files going to user's home dir on destination
+            else {
                 file_copy_to_tmp_homedir( $remainder_of_line, '' );
             }
         }
@@ -119,11 +133,11 @@ sub parse_config {
 }
 
 sub create_tar_file {
-    print "\n\nCreating tar of files for transport...\n";
+    print "\n\nCreating tar of files for transport...\n" if $verbose;
     if ( $Config{osname} =~ /darwin/ ) {
         $mac_tar_options = '--disable-copyfile';
     }
-    system( 'tar', $mac_tar_options, '-cvf', 'totransfer.tar', $dir_for_files );
+    system( 'tar', $mac_tar_options, "-c${v}f", 'totransfer.tar', $dir_for_files );
 }
 
 sub transfer {
@@ -136,25 +150,28 @@ sub transfer {
     my $connected;
 
     if ( $default_user ) {
-        print "\nLogging in with user $user...\n";
+        print "\nLogging in with user $user...\n" if $verbose;
         $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
         $ssh->error
-            and print "Couldn't establish SSH connection: " . $ssh->error;
+            and print "Couldn't establish SSH connection: " . $ssh->error if $verbose;
         $connected = check_ssh_connection( $user, $ssh );
     }
     if ( ! $connected ) {
         if ($use_sudo) {
             print "\nThe default user couldn't log in, so we'll sudo the workaround.
 It's kinda brute, but this will copy all the files as sudo user first, then do it again for root.
-This means sudo user will run any custom scripts...\n\n";
+This means sudo user will run any custom scripts...\n\n" if $verbose;
             $escalated = escalate( $sudo_user, $sys_address_for_scp, %opts );
             if ($escalated) {
-                print "\nNow that root has a key, logging in with $user...\n";
+                print "\nNow that root has a key, logging in with $user...\n" if $verbose;
                 $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-                $ssh->error
-                    and print "Couldn't establish SSH connection: " . $ssh->error
+                if ($ssh->error){
+                    if ($verbose) {
+                        print "Couldn't establish SSH connection: " . $ssh->error
+                    };
                     # and $sudo_available = 1; # TODO set global empty
-                    and $escalated = 0;
+                    $escalated = 0;
+                }
             }
         }
 
@@ -181,7 +198,7 @@ sub check_ssh_connection {
     my ( $user_local, $ssh_local ) = @_;
 
     if ( (!defined $ssh_local) || ($ssh_local == 0) ){ # TODO refactor
-        print "Remote connection was not set up properly.\n";
+        print "Remote connection was not set up properly.\n" if $verbose;
         return 0;
     }
     my $me = $ssh_local->capture("whoami");
@@ -189,15 +206,16 @@ sub check_ssh_connection {
         $me = '';
     }
     chomp( $me );
-    $ssh_local->error and
-      print "Remote command failed: " . $ssh_local->error . "\n";
+    if ($ssh_local->error) {
+      print "Remote command failed: " . $ssh_local->error . "\n" if $verbose;
+    }
 
     if ( $me eq $user_local ) {
-        print "Remote connection was set up properly...\n";
+        print "Remote connection was set up properly...\n" if $verbose;
         return 1;
     }
     else {
-        print "Remote connection was not set up properly:\n$me\n";
+        print "Remote connection was not set up properly:\n$me\n" if $verbose;
         return 0;
     }
 }
@@ -210,10 +228,10 @@ sub try_input_pass {
     chomp( my $pass = <STDIN> );
     $opts_local{'password'} = $pass;
 
-    print "Logging in with user $opts_local{'user'}...\n";
+    print "Logging in with user $opts_local{'user'}...\n" if $verbose;
     my $ssh_local = Net::OpenSSH->new( $sys_address_for_scp, %opts_local );
     if ( $ssh_local->error ) {
-        print "Couldn't establish SSH connection: " . $ssh_local->error . "\n";
+        print "Couldn't establish SSH connection: " . $ssh_local->error . "\n" if $verbose;
         return 0;
     }
     else {
@@ -225,7 +243,7 @@ sub escalate {
     my ( $sudo_user_local, $sys_address_for_scp, %opts_sudo ) = @_;
 
     $opts_sudo{'user'} = $sudo_user_local;
-    print "Logging in with user $sudo_user_local...\n";
+    print "Logging in with user $sudo_user_local...\n" if $verbose;
     my $ssh_sudo = Net::OpenSSH->new( $sys_address_for_scp, %opts_sudo );
     my $connected = check_ssh_connection( $sudo_user_local, $ssh_sudo );
     if ( ! $connected ) { # tested, this does produce an error (always? todo) 
@@ -253,7 +271,7 @@ EOF
         return 1;
     }
     else {
-        print "Sudo user was not able to log in. Moving on...\n";
+        print "Sudo user was not able to log in. Moving on...\n" if $verbose;
         return 0;
     }
 }
@@ -261,12 +279,12 @@ EOF
 sub transfer_and_expand_files {
     my $ssh = shift;
 
-    print "\nCopying files to destination...\n";
+    print "\nCopying files to destination...\n" if $verbose;
     $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
     $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
 
-    print "\nExpanding files on destination...\n";
-    $ssh->system( 'perl', './provision_expand.pl' )
+    print "\nExpanding files on destination...\n" if $verbose;
+    $ssh->system( 'perl', './provision_expand.pl', "$v" )
         or die "remote command failed: " . $ssh->error;
 }
 
@@ -274,7 +292,7 @@ sub make_tmp_dir {
     my $dir_for_files = shift;
     if ( -d $dir_for_files ) {    # transfer will keep this tmp files dir
         system( 'rm', '-rf', "${dir_for_files}.bak" );
-        system( 'mv', '-v', $dir_for_files, "${dir_for_files}.bak" );
+        system( 'mv', "-f$v", $dir_for_files, "${dir_for_files}.bak" );
     }
     system( 'mkdir', $dir_for_files );
 }
@@ -288,7 +306,7 @@ sub file_copy_to_tmp_homedir {
     else {
         $new_filename = $change_name_to;
     }
-    print "\nAdding $filename to local copy of files for transport...";
+    print "\nAdding $filename to local copy of files for transport..." if $verbose;
     system( 'cp', "files/$filename", "$dir_for_files/$new_filename" );
 }
 
@@ -329,7 +347,7 @@ sub stitch_file {
 
 sub help {
     print "\nPlease enter one or two arguments:\n";
-    print "provision.pl <system_name|ip_address> [username]\n\n";
+    print "provision.pl [-v] <system_name|ip_address> [username]\n\n";
     print "/system.plans - list of systems' plans\n";
     print "/files - list of files to include in those plans\n\n";
     print "-nodefuser = no default user - don't try the main username before sudo user\n";

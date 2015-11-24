@@ -2,11 +2,16 @@
 use strict;
 use warnings;
 
+my $v = '';
+if ( grep {/v/} @ARGV ) {
+    $v = 'v';
+};
+
 my $dir_for_files = "$ENV{HOME}/tmp/provision_files";
 
 bash_custom_refs();
 
-system( 'tar', '-C', $ENV{HOME}, '-xvf',
+system( 'tar', '-C', $ENV{HOME}, "-x${v}f",
     "$ENV{HOME}/transferred_by_provision_script.tar" );
 
 chomp( my @files = grep { !/^\.*$/ } `ls -a $dir_for_files` );
@@ -22,7 +27,12 @@ for my $file (@files) {
     }
 }
 
-## subroutines
+print "\nFile expansion on the remote server is complete.\n";
+if ( $v eq '' ) {
+    print "This message does not indicate success (hint: -v).\n\n";
+}
+
+
 sub bash_custom_refs {
     my $add_to_startups = <<'EOF';
 
