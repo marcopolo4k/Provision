@@ -8,8 +8,22 @@ use Test::More 'no_plan';
 
 # ok( provision::main(), "it worked" );
 
-no warnings 'redefine';
-local *$provision::user='MOCK_USER';
-ok( provision::transfer(), "it worked" );
+no warnings qw{ redefine once };
+# {
+#     #local *$provision::user='MOCK_USER';
+#     local $provision::user='MOCK_USER';
+#     ok( provision::transfer(), "it worked" );
+# }
+
+{
+    local *$provision::create_tar_file = sub {
+        "creating tar .... tar tar tar";
+    }
+    like( $provision::create_tar_file, q/tar/, "tar reports file creating" );
+}
+
 
 done_testing();
+
+
+# * for subs to keep them from running

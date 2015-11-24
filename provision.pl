@@ -14,7 +14,7 @@ my $verbose         = '';
 my $v               = '';
 my $system;
 my $sys_address_for_scp;
-my $user;
+our $user;
 my $sudo_user;
 my $sudo_pass;
 my $ssh_key         = '';
@@ -30,7 +30,7 @@ my $dir_for_files   = 'tmp/provision_files';
 exit main() unless caller();
 
 sub main {
-    help() if ( @ARGV < 1 or 5 < @ARGV );
+    help() if ( @ARGV < 1 or 7 < @ARGV );
     GetOptions(
         "system=s"  => \$system,
         "user=s"    => \$user,
