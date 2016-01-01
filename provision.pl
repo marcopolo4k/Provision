@@ -10,8 +10,8 @@ use Config;
 use Path::Tiny qw(path);
 
 my $help;
-my $verbose         = '';
-my $v               = '';
+my $verbose = '';
+my $v       = '';
 my $system;
 my $sys_address_for_scp;
 our $user;
@@ -20,7 +20,7 @@ my $sudo_pass;
 my $ssh_key         = '';
 my $port            = '22';
 my $transfer        = 1;
-my $default_user    = 1; # try default user before sudo user
+my $default_user    = 1;                       # try default user before sudo user
 my $use_sudo        = 0;
 my $tried_sudo      = 0;
 my $escalated       = 0;
@@ -40,13 +40,13 @@ sub main {
         "help"      => \$help
     ) or die("Error in command line arguments\n");
     help() if ( defined $help );
-    if ( !defined $system ){
-        if ( !defined $ARGV[0] || $ARGV[0] eq '' ){
+    if ( !defined $system ) {
+        if ( !defined $ARGV[0] || $ARGV[0] eq '' ) {
             help();
         }
         else {
             $system = $ARGV[0];
-        };
+        }
     }
     $sys_address_for_scp = $system;
     $v = 'v' if $verbose;
@@ -60,7 +60,7 @@ sub main {
         }
     }
 
-    make_tmp_dir($dir_for_files); # for backups and unit tests
+    make_tmp_dir($dir_for_files);    # for backups and unit tests
 
     set_sysip_prompt() if $sys_address_for_scp =~ /(\d{1,3}\.){3}\d{1,3}/;
 
@@ -68,14 +68,13 @@ sub main {
 
     create_tar_file();
 
-    if ($transfer) { # some testing avoids this
+    if ($transfer) {                 # some testing avoids this
         transfer();
         cleanup();
     }
 
-    return 0
+    return 0;
 }
-
 
 sub parse_config {
     print "\nParsing system config file...\n" if $verbose;
@@ -85,6 +84,7 @@ sub parse_config {
     chomp( my @lines = read_file("system.plans/${user}\@$system") );
     foreach my $line (@lines) {
         $line =~ s/~/$ENV{HOME}/g;
+
         # so can't really use colons in any of these features
         if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
             $sudo_user = $1;
@@ -93,6 +93,7 @@ sub parse_config {
         elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
             $ssh_key = $1;
             system( 'cp', "${ssh_key}.pub", "$dir_for_files/ssh_key" );
+
             # this pub check isn't used unless user messes up, but it's not well tested
             if ( $ssh_key =~ /(.*)\.pub$/ ) {
                 $ssh_key = $1;
@@ -103,11 +104,12 @@ sub parse_config {
         }
         elsif ( $line =~ /^FILE:(.*)/ ) {
             my $remainder_of_line = $1;
-            if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {    
+            if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {
                 my ( $filename, $search, $replace ) = ( $1, $2, $3 );
                 file_copy_to_tmp_homedir( $filename, '' );
                 replace_text_in_file( $dir_for_files, $filename, $search, $replace );
             }
+
             # default files going to user's home dir on destination
             else {
                 file_copy_to_tmp_homedir( $remainder_of_line, '' );
@@ -120,10 +122,10 @@ sub parse_config {
         }
         elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
             my $filename       = $1;
-            my $change_name_to = 'zzRUN_BASH_' . $filename; # scripts to run handled last
+            my $change_name_to = 'zzRUN_BASH_' . $filename;    # scripts to run handled last
             file_copy_to_tmp_homedir( $filename, $change_name_to );
         }
-        else {    # should be nothing
+        else {                                                 # should be nothing
             print "The system file has an (improperly|un)labeled entry:\n";
             print "[$line]\n";
             print "Please see docs or label all entries\n";
@@ -149,14 +151,17 @@ sub transfer {
     my $ssh;
     my $connected;
 
-    if ( $default_user ) {
+    if ($default_user) {
         print "\nLogging in with user $user...\n" if $verbose;
         $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-        $ssh->error
-            and print "Couldn't establish SSH connection: " . $ssh->error if $verbose;
+        if ( $ssh->error ) {
+            if ($verbose) {
+                print "Couldn't establish SSH connection: " . $ssh->error
+            }
+        }
         $connected = check_ssh_connection( $user, $ssh );
     }
-    if ( ! $connected ) {
+    if ( !$connected ) {
         if ($use_sudo) {
             print "\nThe default user couldn't log in, so we'll sudo the workaround.
 It's kinda brute, but this will copy all the files as sudo user first, then do it again for root.
@@ -165,17 +170,18 @@ This means sudo user will run any custom scripts...\n\n" if $verbose;
             if ($escalated) {
                 print "\nNow that root has a key, logging in with $user...\n" if $verbose;
                 $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-                if ($ssh->error){
+                if ( $ssh->error ) {
                     if ($verbose) {
-                        print "Couldn't establish SSH connection: " . $ssh->error
-                    };
+                        print "Couldn't establish SSH connection: " . $ssh->error;
+                    }
+
                     # and $sudo_available = 1; # TODO set global empty
                     $escalated = 0;
                 }
             }
         }
 
-        if ( ! $escalated ) {
+        if ( !$escalated ) {
             $ssh = try_input_pass( $sys_address_for_scp, %opts );
         }
 
@@ -197,17 +203,17 @@ sub cleanup {
 sub check_ssh_connection {
     my ( $user_local, $ssh_local ) = @_;
 
-    if ( (!defined $ssh_local) || ($ssh_local == 0) ){ # TODO refactor
+    if ( ( !defined $ssh_local ) || ( $ssh_local == 0 ) ) {    # TODO refactor
         print "Remote connection was not set up properly.\n" if $verbose;
         return 0;
     }
     my $me = $ssh_local->capture("whoami");
-    if ( ! defined $me ) {
+    if ( !defined $me ) {
         $me = '';
     }
-    chomp( $me );
-    if ($ssh_local->error) {
-      print "Remote command failed: " . $ssh_local->error . "\n" if $verbose;
+    chomp($me);
+    if ( $ssh_local->error ) {
+        print "Remote command failed: " . $ssh_local->error . "\n" if $verbose;
     }
 
     if ( $me eq $user_local ) {
@@ -246,7 +252,7 @@ sub escalate {
     print "Logging in with user $sudo_user_local...\n" if $verbose;
     my $ssh_sudo = Net::OpenSSH->new( $sys_address_for_scp, %opts_sudo );
     my $connected = check_ssh_connection( $sudo_user_local, $ssh_sudo );
-    if ( ! $connected ) { # tested, this does produce an error (always? todo) 
+    if ( !$connected ) {    # tested, this does produce an error (always? todo)
         $ssh_sudo = try_input_pass( $sys_address_for_scp, %opts_sudo );
     }
     $connected = check_ssh_connection( $sudo_user_local, $ssh_sudo );
