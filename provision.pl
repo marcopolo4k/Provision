@@ -196,8 +196,8 @@ This means sudo user will run any custom scripts...\n\n" if $verbose;
 }
 
 sub cleanup {
-    system(qq{ rm -rf $dir_for_files }) if ($transfer);
-    system(q{ rm -rf totransfer.tar })  if ($transfer);
+    system(qq{ rm -rf $dir_for_files });
+    system(q{ rm -rf totransfer.tar });
 }
 
 sub check_ssh_connection {

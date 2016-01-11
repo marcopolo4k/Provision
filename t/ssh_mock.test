@@ -1,14 +1,16 @@
 #!/usr/bin/perl
+require '../provision.pl';
+require 'test.pl';
+
 use strict;
 use warnings;
 
-require '../provision.pl';
-
+use Net::OpenSSH;
 use Test::More 'no_plan';
-
-# ok( provision::main(), "it worked" );
+require_ok '../provision.pl';
 
 no warnings qw{ redefine once };
+
 # {
 #     #local *$provision::user='MOCK_USER';
 #     local $provision::user='MOCK_USER';
@@ -16,14 +18,41 @@ no warnings qw{ redefine once };
 # }
 
 {
-    local *$provision::create_tar_file = sub {
-        "creating tar .... tar tar tar";
-    }
-    like( $provision::create_tar_file, q/tar/, "tar reports file creating" );
+    local *Net::OpenSSH::new = sub { bless {}, "MOCK::OpenSSH" };
+    my $out = provision::transfer();
+    print "(debug) out: [$out]\n" if $out; 
+    
+    #like( $provision::create_tar_file, qr/tar/, "tar reports file creating" );
 }
-
 
 done_testing();
 
 
 # * for subs to keep them from running
+
+package MOCK::OpenSSH;
+
+use Test::More;
+
+# sub transfer {
+#     print "transferring .... \n";
+# }
+# sub create_tar_file {
+#     "creating tar .... tar tar tar";
+# }
+
+sub cmd {
+    my ( $self, @cmd ) = @_;
+    die "unknown command: $cmd[0]" if $cmd[0] ne 'tar';
+    pass "mock ssh called with: ".join( " ", @cmd);
+    $self
+}
+
+sub error {
+    print "Error: \$ssh->error was called.\n";
+}
+sub capture {
+    print "\$ssh->capture was called.\n";
+}
+
+1
