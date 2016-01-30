@@ -31,11 +31,11 @@ foreach my $file ( qw/ssh_key .bash_custom .vimrc/ ) {
     like( $tar_list, qr/$file/, "$file was added to ./tmp/provision_files directory" );
 }
 
-# checking for words indicating specific functionality works
+## checking for words indicating specific functionality works
 my @check_text_array = ( 
     { 'title' => 'SNR for FILE',   'file' => '.vimrc',       'text' => 'cpanel-store' },
     { 'title' => 'SNR for STITCH', 'file' => '.bash_custom', 'text' => 'NewName' }, 
-    { 'title' => 'ADD_TO',       'file' => '.bash_custom', 'text' => 'test text in custom file' } 
+    { 'title' => 'ADD_TO',         'file' => '.bash_custom', 'text' => 'test text in custom file' } 
 );
 # ensure certain words are in dummy system file
 foreach my $feature_first_check ( @check_text_array ) {
