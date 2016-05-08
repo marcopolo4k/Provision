@@ -10,3 +10,4 @@ FILE:.vimrc:SNR:set tags.*:set tags=./tags,tags,/home/store/git/cpanel-store/tag
 FILE:cpvmsetup_fast.pl
 FILE:cpvmsetup_slow.pl
 FILE:.tmux.conf
+FILE:.gitconfig
