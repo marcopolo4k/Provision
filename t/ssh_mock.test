@@ -1,58 +1,75 @@
 #!/usr/bin/perl
 require '../provision.pl';
-require 'test.pl';
 
 use strict;
 use warnings;
 
 use Net::OpenSSH;
 use Test::More 'no_plan';
+use Test::Deep;
 require_ok '../provision.pl';
 
 no warnings qw{ redefine once };
 
-# {
-#     #local *$provision::user='MOCK_USER';
-#     local $provision::user='MOCK_USER';
-#     ok( provision::transfer(), "it worked" );
-# }
-
 {
+    diag "HAPPY PATH TRANSFER";
+
+    # '*' is for subs to overwrite?
     local *Net::OpenSSH::new = sub { bless {}, "MOCK::OpenSSH" };
-    my $out = provision::transfer();
-    print "(debug) out: [$out]\n" if $out; 
-    
-    #like( $provision::create_tar_file, qr/tar/, "tar reports file creating" );
+
+    # have to use our scope for all vars here
+    #local $provision::verbose             = 1;
+    local $provision::user                = 'root';
+    local $provision::ssh_key             = '/Users/marco/.ssh/petvms';
+    local $provision::sys_address_for_scp = '127.0.0.1';
+    provision::transfer();
 }
 
 done_testing();
 
-
-# * for subs to keep them from running
-
 package MOCK::OpenSSH;
 
 use Test::More;
+use Test::Deep;
 
-# sub transfer {
-#     print "transferring .... \n";
-# }
-# sub create_tar_file {
-#     "creating tar .... tar tar tar";
-# }
+sub scp_put {
+    my ( $self, @scp_args ) = @_;
+
+    diag "\$ssh->scp_put called with: " . join( " ", @scp_args ) . "\n";
+    my @acceptable_args = (qw!totransfer.tar ./transferred_by_provision_script.tar expand.pl ./provision_expand.pl!);
+    cmp_deeply( \@scp_args, subbagof(@acceptable_args), "scp args are in list of acceptable values." );
+
+    $self;
+}
+
+sub system {
+    my ( $self, @system_args ) = @_;
+
+    @system_args = grep { $_ ne '' } @system_args;
+    my @acceptable_args = (qw!perl ./provision_expand.pl!);
+    cmp_deeply( \@system_args, bag(@acceptable_args), "system args are: perl or ./provision_expand.pl" );
+
+    $self;
+}
 
 sub cmd {
     my ( $self, @cmd ) = @_;
+
+    # I should eventually use cmd, but not sure how yet
     die "unknown command: $cmd[0]" if $cmd[0] ne 'tar';
-    pass "mock ssh called with: ".join( " ", @cmd);
-    $self
+    pass "mock ssh called with: " . join( " ", @cmd );
+
+    $self;
 }
 
 sub error {
-    print "Error: \$ssh->error was called.\n";
+    diag "\$ssh->error was called, probably just to check if there is one, mock returning 0.\n";
+    return 0;
 }
+
 sub capture {
-    print "\$ssh->capture was called.\n";
+    diag "\$ssh->capture was called, mock returning root.\n";
+    return 'root';
 }
 
 1

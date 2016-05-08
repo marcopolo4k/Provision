@@ -10,14 +10,14 @@ use Config;
 use Path::Tiny qw(path);
 
 my $help;
-my $verbose = '';
+our $verbose = '';
 my $v       = '';
 my $system;
-my $sys_address_for_scp;
+our $sys_address_for_scp;
 our $user;
 my $sudo_user;
 my $sudo_pass;
-my $ssh_key         = '';
+our $ssh_key        = '';
 my $port            = '22';
 my $transfer        = 1;
 my $default_user    = 1;                       # try default user before sudo user
@@ -161,6 +161,7 @@ sub transfer {
         }
         $connected = check_ssh_connection( $user, $ssh );
     }
+
     if ( !$connected ) {
         if ($use_sudo) {
             print "\nThe default user couldn't log in, so we'll sudo the workaround.
@@ -204,7 +205,7 @@ sub check_ssh_connection {
     my ( $user_local, $ssh_local ) = @_;
 
     if ( ( !defined $ssh_local ) || ( $ssh_local == 0 ) ) {    # TODO refactor
-        print "Remote connection was not set up properly.\n" if $verbose;
+        print "Remote connection was not set up properly (no \$ssh_local).\n" if $verbose;
         return 0;
     }
     my $me = $ssh_local->capture("whoami");
