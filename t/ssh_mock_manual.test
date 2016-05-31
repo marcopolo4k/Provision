@@ -8,16 +8,31 @@ use Net::OpenSSH;
 use Test::More 'no_plan';
 use Test::Deep;
 require_ok '../provision.pl';
-use Test::MockModule;
 
 no warnings qw{ redefine once };
 
+{
+    diag "HAPPY PATH TRANSFER";
 
-diag "HAPPY PATH TRANSFER";
+    # '*' is for subs to overwrite?
+    local *Net::OpenSSH::new = sub { bless {}, "MOCK::OpenSSH" };
 
-my $ssh = Test::MockModule->new('Net::OpenSSH');
+    # have to use our scope for all vars here
+    #local $provision::verbose             = 1;
+    local $provision::user                = 'root';
+    local $provision::ssh_key             = '/Users/marco/.ssh/petvms';
+    local $provision::sys_address_for_scp = '127.0.0.1';
+    provision::transfer();
+}
 
-$ssh->mock('scp_put', sub {
+done_testing();
+
+package MOCK::OpenSSH;
+
+use Test::More;
+use Test::Deep;
+
+sub scp_put {
     my ( $self, @scp_args ) = @_;
 
     diag "\$ssh->scp_put called with: " . join( " ", @scp_args ) . "\n";
@@ -25,9 +40,9 @@ $ssh->mock('scp_put', sub {
     cmp_deeply( \@scp_args, subbagof(@acceptable_args), "scp args are in list of acceptable values." );
 
     $self;
-});
+}
 
-$ssh->mock('system', sub {
+sub system {
     my ( $self, @system_args ) = @_;
 
     @system_args = grep { $_ ne '' } @system_args;
@@ -35,9 +50,9 @@ $ssh->mock('system', sub {
     cmp_deeply( \@system_args, bag(@acceptable_args), "system args are: perl or ./provision_expand.pl" );
 
     $self;
-});
+}
 
-$ssh->mock('cmd', sub {
+sub cmd {
     my ( $self, @cmd ) = @_;
 
     # I should eventually use cmd, but not sure how yet
@@ -45,24 +60,16 @@ $ssh->mock('cmd', sub {
     pass "mock ssh called with: " . join( " ", @cmd );
 
     $self;
-});
+}
 
-$ssh->mock('error', sub {
+sub error {
     diag "\$ssh->error was called, probably just to check if there is one, mock returning 0.\n";
     return 0;
-});
+}
 
-$ssh->mock('capture', sub {
+sub capture {
     diag "\$ssh->capture was called, mock returning root.\n";
     return 'root';
-});
-
-# have to use our scope for all vars here
-local $provision::verbose             = 1;
-local $provision::user                = 'root';
-local $provision::ssh_key             = '/Users/marco/.ssh/petvms';
-local $provision::sys_address_for_scp = '127.0.0.1';
-local $provision::port = 2222;
-provision::transfer();
+}
 
 1
