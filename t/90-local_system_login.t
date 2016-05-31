@@ -9,13 +9,17 @@ use Net::OpenSSH;
 chdir("../") or die "cannot change: $!\n";
 
 # i've seen sometimes sends out to err, so capture both & check error codes
-diag 'Using ./provision.pl -system 127.0.0.1 2>&1';
-my $out = `./provision.pl -system 127.0.0.1 2>&1` ;
+my $run_prov_on_local = './provision.pl -v -system 127.0.0.1 2>&1';
+diag 'Using ' . $run_prov_on_local;
+my $out = `$run_prov_on_local` ;
+
 like( $out, qr!a tmp/provision_files!, "Text is displayed for local login: 'a tmp/provision_files'" );
 like( `echo $?`, qr/0/, "./provision.pl bash command error code success." );
 like( $?, qr/0/, "perl error code is success." );
 
-foreach my $file (qw/.bash_custom .vimrc ssh_key RUN_BASH_local_test_vm.sh/) {
+chomp( my @file_list_text = `grep ^FILE system.plans/root\@127.0.0.1 | cut -d: -f2` );
+unshift @file_list_text, qw/.bash_custom ssh_key zzRUN_BASH_cpvmsetup_fast.sh/;
+foreach my $file (@file_list_text) {
     like( $out, qr!a tmp/provision_files/$file!, "Text is displayed indicating $file was transferred to local login: 'a tmp/provision_files/$file'" );
 }
 
@@ -46,6 +50,24 @@ my $old_cpvmsetup_slow = $ssh->capture("find cpvmsetup_slow.pl -mmin +1 2>&1");
 unlike( $old_cpvmsetup_slow, qr/cpvmsetup_slow.pl$/, "remote system cpvmsetup_slow.pl is not old" );
 unlike( $old_cpvmsetup_slow, qr/No such file/, "remote system cpvmsetup_slow.pl exists" );
 
-
-my $files_in_home = $ssh->capture("ls ~ 2>&1");
-like( $files_in_home, qr/it_worked.txt/, "Bash script executed and created file on remote system." );
+# going back and forth with how to deal with SNR files. See the commented like below.
+#chomp( my @file_list_content = `grep ^FILE system.plans/root\@127.0.0.1 | grep -v SNR | cut -d: -f2` );
+chomp( my @file_list_content = `grep ^FILE system.plans/root\@127.0.0.1 | cut -d: -f2` );
+foreach my $file (@file_list_content) {
+    my $file_contents_remote = $ssh->capture("cat ~/$file 2>&1");
+    my $file_contents_local;
+    {
+        local $/;
+        open my $fh, '<', "./files/$file" or die "can't open $file: $!";
+        $file_contents_local = <$fh>;
+    }
+    # going back and forth with how to deal with SNR files.
+    #like( $file_contents_local, qr/^\Q$file_contents_remote\E/, "Remote content matches local content for file $file." );
+    if ( $file eq '.vimrc' ){
+        use Text::Diff;
+        my $diff = diff \$file_contents_local, \$file_contents_remote;
+        print "Skipping vimrc, here's the diff:\n$diff\n"; 
+        next;
+    }
+    like( $file_contents_local, qr/^\Q$file_contents_remote\E/, "Remote content matches local content for file $file." );
+}
