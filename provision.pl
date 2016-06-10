@@ -286,12 +286,19 @@ EOF
 sub transfer_and_expand_files {
     my $ssh = shift;
 
+    chomp( my $home_dir = $ssh->capture('echo $HOME') );
+
     print "\nCopying files to destination...\n" if $verbose;
-    $ssh->scp_put( 'totransfer.tar', './transferred_by_provision_script.tar' );
-    $ssh->scp_put( 'expand.pl',      './provision_expand.pl' );
+    my %opts = (
+        #verbose => 1,
+    );
+    my $ret = $ssh->scp_put( \%opts, 'totransfer.tar', "$home_dir/transferred_by_provision_script.tar" )
+        or die "remote command failed: " . $ssh->error;
+    $ret = $ssh->scp_put( \%opts, 'expand.pl',      "$home_dir/provision_expand.pl" )
+        or die "remote command failed: " . $ssh->error;
 
     print "\nExpanding files on destination...\n" if $verbose;
-    $ssh->system( 'perl', './provision_expand.pl', "$v" )
+    $ssh->system( 'perl', $home_dir . '/provision_expand.pl', "$v" )
         or die "remote command failed: " . $ssh->error;
 }
 
