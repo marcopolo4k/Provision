@@ -46,9 +46,10 @@ EOF
 
 sub ensure_bash_custom_ref {
     my ( $filename, $add_to_startups ) = @_;
-    my $already_has_it = !system( 'grep', '-q', 'bash_custom', $filename );
+    my $file = "$ENV{HOME}/$filename";
+    my $already_has_it = !system( 'grep', '-q', 'bash_custom', $file );
     if ( !$already_has_it ) {
-        open( my $fh, '>>', $filename ) or die "Couldn't open file $!";
+        open( my $fh, '>>', $file ) or die "Couldn't open file $!";
         print $fh $add_to_startups;
     }
 }
