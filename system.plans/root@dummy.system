@@ -11,3 +11,4 @@ FILE:cpvmsetup_fast.pl
 FILE:cpvmsetup_slow.pl
 FILE:.tmux.conf
 FILE:.gitconfig
+RUN_BASH_SCRIPT:install_vundle_plugins.sh
