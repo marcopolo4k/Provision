@@ -1,5 +1,5 @@
-files/*
-system.plans/*
+.DS_Store
+provision.tgz
 t/provision_files.bak/*
 totransfer.tar
 t/totransfer.tar

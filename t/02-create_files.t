@@ -11,7 +11,7 @@ $dir_grep =~ /'(.*)'/;
 my $dir_for_files = $1;
 
 my $qr = '';
-my $out_local_login = `./provision.pl -v -system dummy.system -user root -notransfer 2>&1`;
+my $out_local_login = `provision -v -system dummy.system -user root -notransfer 2>&1`;
 $qr = "a tmp/provision_files";
 like( $out_local_login, qr/$qr/, "Text is displayed for local login: '$qr'" );
 $qr = "a tmp/provision_files/.bash_custom";

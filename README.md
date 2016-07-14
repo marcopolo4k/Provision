@@ -3,13 +3,17 @@ Provision
 
 Script to provision files to linux VM's. Developed on Mac->CentOS.
 
+Similar to puppet etc but this was an attempt to focus on automating the login.
+I'm sure it's recreating the wheel to some extent - kind of a learning project, but I use it.
+
 # Usage
 Use one or two arguments:
 ```
-./provision.pl system_name [username]
+provision system_name [username]
+(default user is root)
 ```
-- /system.plans - list of systems' plans
-- /files - list of files to include in those plans
+~/prov_config/system_plans - list of systems' plans (ls this to look for hostnames)
+~/prov_config/files - list of files to include in those plans
 
 ## Features
 This is mainly designed to get basic environment stuffs over to a newly provisioned VM: 
@@ -24,14 +28,23 @@ But, it will also:
 - 'sudo -i' to root if needed (like some local cP OS images).
 
 ## Installation
-perl modules need to be installed:
+1.) perl modules need to be installed:
 ```
 cpan -i Getopt::Long File::Slurp Net::OpenSSH Config Path::Tiny
 ```
 
+2.) Install project source (to any dir, but ~ is the example)
+```
+cd ~
+git clone https://github.com/cPMarco/Provision.git
+cd ~/Provision
+make install
+```
+
+3.) set up config files
 The system.plans/files look something like (without the '#' comments):
 ```
-[~/provision/system.plans]$ cat userme\@demotest.server
+[~/prov_config/system_plans]$ cat userme\@demotest.server
 SSH_KEY:~/.ssh/id_rsa
 SSH_PORT:602
 FILE:a_file_you_want_in_homedir.txt
@@ -44,5 +57,6 @@ STITCH_FILES:.bash_custom:bash_custom.anotherone:SNR:search for this:replace wit
 ESCALATE_USER:username # Use this with caution: this feature logs in as named user, sudo escalates to root, enables root login. It handles some little-understood cases specific for cP OpenStack VM's, so the logic might be .... confusing.
 ```
 
-Examples of what I use can be found inside our wiki:
+Examples (everything I use) and Howto's:
+https://enterprise.cpanel.net/users/marco/repos/prov_config/browse
 https://cpanel.wiki/display/~marco/Provision+Environment+to+CentOS+VM

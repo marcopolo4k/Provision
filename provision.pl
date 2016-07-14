@@ -25,7 +25,7 @@ my $use_sudo        = 0;
 my $tried_sudo      = 0;
 my $escalated       = 0;
 my $mac_tar_options = '';
-my $dir_for_files   = 'tmp/provision_files';
+my $dir_for_files   = '/tmp/provision_files';
 
 exit main() unless caller();
 
@@ -78,10 +78,10 @@ sub main {
 
 sub parse_config {
     print "\nParsing system config file...\n" if $verbose;
-    unless ( -e "system.plans/${user}\@$system" ) {
+    unless ( -e "$ENV{HOME}/prov_config/system_plans/${user}\@$system" ) {
         $system = 'DEFAULT';
     }
-    chomp( my @lines = read_file("system.plans/${user}\@$system") );
+    chomp( my @lines = read_file("$ENV{HOME}/prov_config/system_plans/${user}\@$system") );
     foreach my $line (@lines) {
         $line =~ s/~/$ENV{HOME}/g;
 
@@ -294,7 +294,7 @@ sub transfer_and_expand_files {
     );
     my $ret = $ssh->scp_put( \%opts, 'totransfer.tar', "$home_dir/transferred_by_provision_script.tar" )
         or die "remote command failed: " . $ssh->error;
-    $ret = $ssh->scp_put( \%opts, 'expand.pl',      "$home_dir/provision_expand.pl" )
+    $ret = $ssh->scp_put( \%opts, '/usr/local/bin/provision_expand.pl',      "$home_dir/provision_expand.pl" )
         or die "remote command failed: " . $ssh->error;
 
     print "\nExpanding files on destination...\n" if $verbose;
@@ -321,7 +321,7 @@ sub file_copy_to_tmp_homedir {
         $new_filename = $change_name_to;
     }
     print "\nAdding $filename to local copy of files for transport..." if $verbose;
-    system( 'cp', "files/$filename", "$dir_for_files/$new_filename" );
+    system( 'cp', "$ENV{HOME}/prov_config/files/$filename", "$dir_for_files/$new_filename" );
 }
 
 sub set_sysip_prompt {
@@ -347,14 +347,14 @@ sub stitch_file {
     if ( $remainder_of_line =~ /^SNR:/ ) {
         $remainder_of_line =~ /SNR:(.*):(.*)/;
         my ( $search, $replace ) = ( $1, $2 );
-        $file_part = read_file("files/$filename_local");
+        $file_part = read_file("$ENV{HOME}/prov_config/files/$filename_local");
         $file_part =~ s/$search/$replace/g;
     }
     elsif ( $filename_local =~ /^ADD_TO$/ ) {
         $file_part = $remainder_of_line;
     }
     else {
-        $file_part = read_file("files/$filename_local");
+        $file_part = read_file("$ENV{HOME}/prov_config/files/$filename_local");
     }
     write_file( "$dir_for_files/$filename_dest", { append => 1 }, "\n# $filename_local\n" . $file_part );
 }
@@ -362,8 +362,8 @@ sub stitch_file {
 sub help {
     print "\nPlease enter one or two arguments:\n";
     print "provision.pl [-v] <system_name|ip_address> [username]\n\n";
-    print "/system.plans - list of systems' plans\n";
-    print "/files - list of files to include in those plans\n\n";
+    print "~/prov_config/system_plans - list of systems' plans\n";
+    print "~/prov_config/files - list of files to include in those plans\n\n";
     print "-nodefuser = no default user - don't try the main username before sudo user\n";
     print "-notransfer = only create files locally and leave them there (for testing)\n\n";
     exit;
