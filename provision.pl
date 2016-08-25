@@ -26,6 +26,7 @@ my $tried_sudo      = 0;
 my $escalated       = 0;
 my $mac_tar_options = '';
 my $dir_for_files   = '/tmp/provision_files';
+my $forward         = '';
 
 exit main() unless caller();
 
@@ -34,6 +35,7 @@ sub main {
     GetOptions(
         "system=s"  => \$system,
         "user=s"    => \$user,
+        "forward"   => \$forward,
         "transfer!" => \$transfer,
         "defuser!"  => \$default_user,
         "verbose"   => \$verbose,
@@ -148,6 +150,9 @@ sub transfer {
         'port'     => $port,
         'key_path' => $ssh_key,
     );
+    if ($forward ne ''){
+        $opts{'forward_agent'} = 1;
+    }
     my $ssh;
     my $connected;
 
@@ -365,6 +370,7 @@ sub help {
     print "~/prov_config/system_plans - list of systems' plans\n";
     print "~/prov_config/files - list of files to include in those plans\n\n";
     print "-nodefuser = no default user - don't try the main username before sudo user\n";
-    print "-notransfer = only create files locally and leave them there (for testing)\n\n";
+    print "-notransfer = only create files locally and leave them there (for testing)\n";
+    print "-forward = forward authentication agent during ssh connection\n\n";
     exit;
 }
