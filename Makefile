@@ -14,6 +14,7 @@ package: test
 	mkdir -p ~/.package
 	install -d ~/.package/bin
 	install provision.pl ~/.package/bin/provision
+	install provision.pl ~/.package/bin/provision-setupfolders
 	install expand.pl ~/.package/bin/provision_expand.pl
 	COPYFILE_DISABLE=1 tar --dir ~/.package -cvzf ./provision.tgz .
 	@# should proly do this in tar
