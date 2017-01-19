@@ -4,7 +4,7 @@ system-test: install
 	# put tests that test post-install here
 
 install: package
-	tar --dir /usr/local -xvf ./provision.tgz
+	sudo tar --dir /usr/local -xvf ./provision.tgz
 
 integration-test: package
 	@# put integration tests (these test a packaging in isolation
