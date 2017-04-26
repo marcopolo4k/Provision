@@ -8,6 +8,10 @@ if ( grep {/v/} @ARGV ) {
 };
 
 my $dir_for_files = "$ENV{HOME}/tmp/provision_files";
+my $dir_to_keep = "$ENV{HOME}/.provisioned";
+unless ( -d $dir_to_keep ){
+    system( "mkdir $dir_to_keep" );
+}
 
 bash_custom_refs();
 
@@ -58,8 +62,8 @@ sub replace_file {
     my ( $filename, $location ) = @_;
     my $full_path_dest = "$location/$filename";
     # if file already exists, save as file.bak
-    if ( -e $full_path_dest ) {
-        system( "cat $full_path_dest >> $full_path_dest.bak" );
+    if ( -e $dir_to_keep ) {
+        system( "cat $full_path_dest > $dir_to_keep/${filename}.bak" );
     }
     system( 'cp', "$dir_for_files/$filename", $full_path_dest );
 }
@@ -77,4 +81,4 @@ sub authorize_key {
 system( 'rm', '-rf', "$dir_for_files" );
 system( 'rm', "$ENV{HOME}/transferred_by_provision_script.tar" );
 system( 'rm', "$ENV{HOME}/provision_expand.pl" );
-
+system( "mv -v $ENV{HOME}/.prov_manifest $dir_to_keep/prov_manifest" );

@@ -15,7 +15,7 @@ my $v       = '';
 my $system;
 our $sys_address_for_scp;
 our $user;
-my $sudo_user;
+my @sudo_users;
 my $sudo_pass;
 our $ssh_key        = '';
 my $port            = '22';
@@ -89,7 +89,7 @@ sub parse_config {
 
         # so can't really use colons in any of these features
         if ( $line =~ /^ESCALATE_USER:(.*)/ ) {
-            $sudo_user = $1;
+            push @sudo_users, $1;
             $use_sudo  = 1;
         }
         elsif ( $line =~ /^SSH_KEY:(.+)/ ) {
@@ -172,18 +172,21 @@ sub transfer {
             print "\nThe default user couldn't log in, so we'll sudo the workaround.
 It's kinda brute, but this will copy all the files as sudo user first, then do it again for root.
 This means sudo user will run any custom scripts...\n\n" if $verbose;
-            $escalated = escalate( $sudo_user, $sys_address_for_scp, %opts );
-            if ($escalated) {
-                print "\nNow that root has a key, logging in with $user...\n" if $verbose;
-                $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
-                if ( $ssh->error ) {
-                    if ($verbose) {
-                        print "Couldn't establish SSH connection: " . $ssh->error;
-                    }
+            for my $sudo_user (@sudo_users){
+                $escalated = escalate( $sudo_user, $sys_address_for_scp, %opts );
+                if ($escalated) {
+                    print "\nNow that root has a key, logging in with $user...\n" if $verbose;
+                    $ssh = Net::OpenSSH->new( $sys_address_for_scp, %opts );
+                    if ( $ssh->error ) {
+                        if ($verbose) {
+                            print "Couldn't establish SSH connection: " . $ssh->error;
+                        }
 
-                    # and $sudo_available = 1; # TODO set global empty
-                    $escalated = 0;
+                        # and $sudo_available = 1; # TODO set global empty
+                        $escalated = 0;
+                    }
                 }
+                last if ($escalated);
             }
         }
 
@@ -327,6 +330,7 @@ sub file_copy_to_tmp_homedir {
     }
     print "\nAdding $filename to local copy of files for transport..." if $verbose;
     system( 'cp', "$ENV{HOME}/prov_config/files/$filename", "$dir_for_files/$new_filename" );
+    system( "echo $new_filename >> $dir_for_files/.prov_manifest" );
 }
 
 sub set_sysip_prompt {

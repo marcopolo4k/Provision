@@ -27,6 +27,10 @@ But, it will also:
 - Run any bash script.
 - 'sudo -i' to root if needed (like some local cP OS images).
 
+Features AFAIK, puppet lacks, or difficult to achieve (I welcome msgs pointing me how to do these):
+- configure a vm without a network connection out to the internet or some other server
+- configure a vm without puppet already running
+
 ## Installation
 1.) perl modules need to be installed:
 ```
