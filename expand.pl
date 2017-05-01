@@ -23,8 +23,13 @@ for my $file (@files) {
     if ( $file =~ /ssh_key/ ) {
         authorize_key($file);
     }
-    elsif ( $file =~ /^zzRUN_BASH_(.*)/ ) {
-        system( "sh $dir_for_files/$file" );
+    elsif ( $file =~ /^zzRUN_([A-Z]+)_(.*)/ ) {
+        if ( $1 =~ /BASH/ ) {    # debug untested
+            system("sh $dir_for_files/$file");
+        }
+        elsif ( $1 =~ /PERL/ ) {
+            system("perl $dir_for_files/$file");
+        }
     }
     else {    # add non-default files above here
         replace_file( $file, "$ENV{HOME}/" );

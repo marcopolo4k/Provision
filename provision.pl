@@ -122,9 +122,10 @@ sub parse_config {
             # $filename_dest, $filename_local (or a directive), $remainder_of_line
             stitch_file( $1, $2, $4 );
         }
-        elsif ( $line =~ /^RUN_BASH_SCRIPT:(.*)/ ) {
-            my $filename       = $1;
-            my $change_name_to = 'zzRUN_BASH_' . $filename;    # scripts to run handled last
+        elsif ( $line =~ /^RUN_([A-Z]+)_SCRIPT:(.*)/ ) {
+            my $lang           = $1; # debug untested
+            my $filename       = $2;
+            my $change_name_to = "zzRUN_${lang}_${filename}";    # scripts to run handled last
             file_copy_to_tmp_homedir( $filename, $change_name_to );
         }
         else {                                                 # should be nothing
