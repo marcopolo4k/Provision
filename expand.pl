@@ -24,12 +24,13 @@ for my $file (@files) {
         authorize_key($file);
     }
     elsif ( $file =~ /^zzRUN_([A-Z]+)_(.*)/ ) {
-        if ( $1 =~ /BASH/ ) {    # debug untested
+        if ( $1 =~ /BASH/ ) {
             system("sh $dir_for_files/$file");
         }
         elsif ( $1 =~ /PERL/ ) {
             system("perl $dir_for_files/$file");
         }
+        replace_file( $file, $dir_to_keep );
     }
     else {    # add non-default files above here
         replace_file( $file, "$ENV{HOME}/" );
