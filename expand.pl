@@ -68,7 +68,7 @@ sub replace_file {
     my ( $filename, $location ) = @_;
     my $full_path_dest = "$location/$filename";
     # if file already exists, save as file.bak
-    if ( -e $dir_to_keep ) {
+    if ( -e $dir_to_keep && -e $full_path_dest ) {
         system( "cat $full_path_dest > $dir_to_keep/${filename}.bak" );
     }
     system( 'cp', "$dir_for_files/$filename", $full_path_dest );
