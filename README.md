@@ -4,7 +4,6 @@ Provision
 Script to provision files to linux VM's. Developed on Mac->CentOS.
 
 Similar to puppet etc but this was an attempt to focus on automating the login.
-I'm sure it's recreating the wheel to some extent - kind of a learning project, but I use it.
 
 # Usage
 Use one or two arguments:
@@ -24,8 +23,9 @@ This is mainly designed to get basic environment stuffs over to a newly provisio
 But, it will also:
 - Perform search and replace on any file copied.
 - Perform the mentioned 'stitching' on any file.
-- Run any bash script.
+- Run any bash or perl script.
 - 'sudo -i' to root if needed (like some local cP OS images).
+- show ~everything it does in ~/.provisioned, and you can put files here too.
 
 Features AFAIK, puppet lacks, or difficult to achieve (I welcome msgs pointing me how to do these):
 - configure a vm without a network connection out to the internet or some other server

@@ -117,13 +117,29 @@ sub parse_config {
                 file_copy_to_tmp_homedir( $remainder_of_line, '' );
             }
         }
+        elsif ( $line =~ /^HIDE:(.*)/ ) {
+            my $remainder_of_line = $1;
+            my $new_name = 'aaHIDE_' . $1;
+            if ( $remainder_of_line =~ /(.*):SNR:(.*):(.*)/ ) {
+                my ( $filename, $search, $replace ) = ( $1, $2, $3 );
+                $new_name = 'aaHIDE_' . $filename;
+                file_copy_to_tmp_homedir( $filename, $new_name );
+                replace_text_in_file( $dir_for_files, $new_name, $search, $replace );
+            }
+
+            # default files 'hiding' in provision's dot folder in user's home dir on 
+            # destination
+            else {
+                file_copy_to_tmp_homedir( $remainder_of_line, $new_name );
+            }
+        }
         elsif ( $line =~ /^STITCH_FILES:(.+?):([^:]+)(:(.+))?/ ) {
 
             # $filename_dest, $filename_local (or a directive), $remainder_of_line
             stitch_file( $1, $2, $4 );
         }
         elsif ( $line =~ /^RUN_([A-Z]+)_SCRIPT:(.*)/ ) {
-            my $lang           = $1; # debug untested
+            my $lang           = $1;
             my $filename       = $2;
             my $change_name_to = "zzRUN_${lang}_${filename}";    # scripts to run handled last
             file_copy_to_tmp_homedir( $filename, $change_name_to );

@@ -23,6 +23,13 @@ for my $file (@files) {
     if ( $file =~ /ssh_key/ ) {
         authorize_key($file);
     }
+    elsif ( $file =~ /^aaHIDE_(.*)/ ) {
+        if ( $1 eq '' ){
+            print "\n[error] Filename empty\n" if ( $1 eq '' );
+            next
+        }
+        replace_file( $file, $dir_to_keep, $1 );
+    }
     elsif ( $file =~ /^zzRUN_([A-Z]+)_(.*)/ ) {
         if ( $1 =~ /BASH/ ) {
             system("sh $dir_for_files/$file");
@@ -65,13 +72,21 @@ sub ensure_bash_custom_ref {
 }
 
 sub replace_file {
-    my ( $filename, $location ) = @_;
+    my ( $name_orig, $location, $change_name_to ) = @_;
+    $change_name_to = '' unless defined $change_name_to; # ugly
+    my $filename;
+    if ( $change_name_to eq '' ) {
+        $filename = $name_orig;
+    }
+    else {
+        $filename = $change_name_to;
+    }
     my $full_path_dest = "$location/$filename";
     # if file already exists, save as file.bak
     if ( -e $dir_to_keep && -e $full_path_dest ) {
         system( "cat $full_path_dest > $dir_to_keep/${filename}.bak" );
     }
-    system( 'cp', "$dir_for_files/$filename", $full_path_dest );
+    system( 'cp', "$dir_for_files/$name_orig", $full_path_dest );
 }
 
 sub authorize_key {
